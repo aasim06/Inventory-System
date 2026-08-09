@@ -50,13 +50,6 @@ const inventoryMenu = {
       icon: icons.DatabaseOutlined
     },
     {
-      id: 'add-item-name',
-      title: 'Add Item Name',
-      type: 'item',
-      url: '/inventory/add-item-name',
-      icon: icons.PlusSquareOutlined
-    },
-    {
       id: 'stock-in',
       title: 'Stock In',
       type: 'item',
