@@ -39,17 +39,21 @@ import MainCard from 'components/MainCard';
 const UNIT_OPTIONS = ['PCS', 'KG', 'Liter', 'Meter', 'Set'];
 
 export default function AddItemNamePage() {
-  const { items, masterItemNames, addMasterItemName, updateMasterItemName, deleteMasterItemName, deleteMultipleMasterItemNames } = useStoreInventory();
+  const { items, categories = [], masterItemNames, addMasterItemName, updateMasterItemName, deleteMasterItemName, deleteMultipleMasterItemNames } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selected, setSelected] = useState([]);
 
-  // Add Master Item Drawer State
+  // Add Master Item Drawer State (7 inputs)
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
   const [newItemName, setNewItemName] = useState({
     name: '',
+    skuCode: `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`,
+    unitPrice: 25,
     category: 'Electrical & Motors',
-    defaultUnit: 'PCS'
+    defaultUnit: 'PCS',
+    initialStock: 50,
+    minThreshold: 10
   });
 
   // Edit Master Item Drawer State
@@ -104,7 +108,15 @@ export default function AddItemNamePage() {
     e.preventDefault();
     if (!newItemName.name.trim()) return;
     addMasterItemName(newItemName);
-    setNewItemName({ name: '', category: 'Electrical & Motors', defaultUnit: 'pcs' });
+    setNewItemName({
+      name: '',
+      skuCode: `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`,
+      unitPrice: 25,
+      category: 'Electrical & Motors',
+      defaultUnit: 'PCS',
+      initialStock: 50,
+      minThreshold: 10
+    });
     setAddDrawerOpen(false);
   };
 
@@ -292,18 +304,18 @@ export default function AddItemNamePage() {
         </Table>
       </TableContainer>
 
-      {/* Drawer 1: Add New Master Item Name */}
+      {/* Drawer 1: Add New Master Item Name (7 Inputs) */}
       <Drawer anchor="right" open={addDrawerOpen} onClose={() => setAddDrawerOpen(false)}>
         <Box sx={{ width: 420, p: 3 }}>
-          <Typography variant="h4" sx={{ mb: 1 }}>
-            Add Master Item Name
+          <Typography variant="h4" sx={{ mb: 2.5 }}>
+            ➕ Add Master Item Name
           </Typography>
-
 
           <form onSubmit={handleAddSubmit}>
             <Stack spacing={2.5}>
+              {/* 1. Item Name */}
               <TextField
-                label="Pre-defined Item Name"
+                label="Item Name"
                 fullWidth
                 required
                 placeholder="e.g. 3HP Electric Motor (3-Phase)"
@@ -311,19 +323,53 @@ export default function AddItemNamePage() {
                 onChange={(e) => setNewItemName({ ...newItemName, name: e.target.value })}
               />
 
+              {/* 2. SKU Code */}
               <TextField
-                label="Category"
+                label="SKU Code / Short ID"
                 fullWidth
-                placeholder="e.g. Electrical & Motors"
-                value={newItemName.category}
-                onChange={(e) => setNewItemName({ ...newItemName, category: e.target.value })}
+                required
+                placeholder="e.g. SKU-84564564 or RM-001"
+                value={newItemName.skuCode}
+                onChange={(e) => setNewItemName({ ...newItemName, skuCode: e.target.value })}
               />
 
+              {/* 3. Price Per Unit */}
+              <TextField
+                label="Price Per Unit ($ / Rs)"
+                type="number"
+                fullWidth
+                required
+                inputProps={{ min: 0, step: 'any' }}
+                value={newItemName.unitPrice}
+                onChange={(e) => setNewItemName({ ...newItemName, unitPrice: parseFloat(e.target.value) || 0 })}
+              />
+
+              {/* 4. Category */}
+              <TextField
+                select
+                label="Category"
+                fullWidth
+                required
+                value={newItemName.category}
+                onChange={(e) => setNewItemName({ ...newItemName, category: e.target.value })}
+              >
+                {(categories.length > 0
+                  ? categories.map((c) => c.name)
+                  : ['Electrical & Motors', 'Mechanical Parts', 'Sensors & Automation', 'Hydraulics', 'Pneumatics', 'Raw Materials', 'General']
+                ).map((cat) => (
+                  <MenuItem key={cat} value={cat}>
+                    {cat}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              {/* 5. Units */}
               <TextField
                 select
                 id="itemUnit"
-                label="Default Measurement Unit"
+                label="Measurement Unit"
                 fullWidth
+                required
                 value={newItemName.defaultUnit}
                 onChange={(e) => setNewItemName({ ...newItemName, defaultUnit: e.target.value })}
               >
@@ -333,6 +379,28 @@ export default function AddItemNamePage() {
                   </MenuItem>
                 ))}
               </TextField>
+
+              {/* 6. Initial Stock Quantity */}
+              <TextField
+                label="Initial Stock Quantity"
+                type="number"
+                fullWidth
+                required
+                inputProps={{ min: 0 }}
+                value={newItemName.initialStock}
+                onChange={(e) => setNewItemName({ ...newItemName, initialStock: parseInt(e.target.value) || 0 })}
+              />
+
+              {/* 7. Min Threshold */}
+              <TextField
+                label="Min Threshold (Low Stock Alert Level)"
+                type="number"
+                fullWidth
+                required
+                inputProps={{ min: 1 }}
+                value={newItemName.minThreshold}
+                onChange={(e) => setNewItemName({ ...newItemName, minThreshold: parseInt(e.target.value) || 1 })}
+              />
 
               <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
                 <Button variant="outlined" color="secondary" onClick={() => setAddDrawerOpen(false)}>
@@ -373,18 +441,43 @@ export default function AddItemNamePage() {
                 />
 
                 <TextField
+                  label="SKU Code"
+                  fullWidth
+                  value={editingItemName.skuCode || ''}
+                  onChange={(e) => setEditingItemName({ ...editingItemName, skuCode: e.target.value })}
+                />
+
+                <TextField
+                  label="Price Per Unit ($ / Rs)"
+                  type="number"
+                  fullWidth
+                  value={editingItemName.unitPrice || 0}
+                  onChange={(e) => setEditingItemName({ ...editingItemName, unitPrice: parseFloat(e.target.value) || 0 })}
+                />
+
+                <TextField
+                  select
                   label="Category"
                   fullWidth
-                  value={editingItemName.category}
+                  value={editingItemName.category || 'General'}
                   onChange={(e) => setEditingItemName({ ...editingItemName, category: e.target.value })}
-                />
+                >
+                  {(categories.length > 0
+                    ? categories.map((c) => c.name)
+                    : ['Electrical & Motors', 'Mechanical Parts', 'Sensors & Automation', 'Hydraulics', 'Pneumatics', 'Raw Materials', 'General']
+                  ).map((cat) => (
+                    <MenuItem key={cat} value={cat}>
+                      {cat}
+                    </MenuItem>
+                  ))}
+                </TextField>
 
                 <TextField
                   select
                   id="itemUnitEdit"
                   label="Default Unit"
                   fullWidth
-                  value={editingItemName.defaultUnit}
+                  value={editingItemName.defaultUnit || 'PCS'}
                   onChange={(e) => setEditingItemName({ ...editingItemName, defaultUnit: e.target.value })}
                 >
                   {UNIT_OPTIONS.map((option) => (
@@ -393,6 +486,22 @@ export default function AddItemNamePage() {
                     </MenuItem>
                   ))}
                 </TextField>
+
+                <TextField
+                  label="Initial Stock Quantity"
+                  type="number"
+                  fullWidth
+                  value={editingItemName.initialStock || 0}
+                  onChange={(e) => setEditingItemName({ ...editingItemName, initialStock: parseInt(e.target.value) || 0 })}
+                />
+
+                <TextField
+                  label="Min Threshold Level"
+                  type="number"
+                  fullWidth
+                  value={editingItemName.minThreshold || 10}
+                  onChange={(e) => setEditingItemName({ ...editingItemName, minThreshold: parseInt(e.target.value) || 1 })}
+                />
 
                 <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
                   <Button variant="outlined" color="secondary" onClick={() => setEditDrawerOpen(false)}>

@@ -207,21 +207,46 @@ export function StoreInventoryProvider({ children }) {
 
   // Master Item Names Actions
   const addMasterItemName = async (nameData) => {
-    const newName = typeof nameData === 'string' ? nameData : nameData.name;
-    const category = typeof nameData === 'object' && nameData.category ? nameData.category : 'General';
-    const defaultUnit = typeof nameData === 'object' && nameData.defaultUnit ? nameData.defaultUnit : 'pcs';
+    const itemObj = typeof nameData === 'string' ? { name: nameData } : nameData;
+    const newName = itemObj.name;
+    const skuCode = itemObj.skuCode || `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const unitPrice = parseFloat(itemObj.unitPrice) || 0;
+    const category = itemObj.category || 'General';
+    const defaultUnit = itemObj.defaultUnit || 'PCS';
+    const initialStock = parseInt(itemObj.initialStock) || 0;
+    const minThreshold = parseInt(itemObj.minThreshold || itemObj.minLevel) || 10;
 
     const newMaster = {
       id: `MST-${Math.floor(1000 + Math.random() * 9000)}`,
       name: newName,
+      skuCode,
+      unitPrice,
       category,
-      defaultUnit
+      defaultUnit,
+      initialStock,
+      minThreshold
     };
 
     setMasterItemNames((prev) => [newMaster, ...prev]);
 
+    // Also auto-add to active Store Items
+    addNewItem({
+      name: newName,
+      itemCode: skuCode,
+      category: category,
+      unit: defaultUnit,
+      totalStock: initialStock,
+      minLevel: minThreshold,
+      unitPrice: unitPrice,
+      rackLocation: 'Main Store'
+    });
+
     try {
-      await supabase.from('master_item_names').insert([{ name: newName, category, default_unit: defaultUnit }]);
+      await supabase.from('master_item_names').insert([{
+        name: newName,
+        category,
+        default_unit: defaultUnit
+      }]);
     } catch (e) {
       console.error(e);
     }
