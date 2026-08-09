@@ -3,6 +3,7 @@ import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
 import {
+  Box,
   Button,
   Checkbox,
   Chip,
@@ -10,6 +11,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Drawer,
   FormControl,
   Grid,
   InputAdornment,
@@ -267,11 +269,14 @@ export default function StockInPage() {
         </Table>
       </TableContainer>
 
-      {/* Modal: Add Stock In */}
-      <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>📥 Add Stock In (Receive Shipment)</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
+      {/* Drawer: Add Stock In */}
+      <Drawer anchor="right" open={modalOpen} onClose={() => setModalOpen(false)}>
+        <Box sx={{ width: 420, p: 3 }}>
+          <Typography variant="h4" sx={{ mb: 3 }}>
+            📥 Add Stock In (Receive Shipment)
+          </Typography>
+
+          <Stack spacing={2.5}>
             <FormControl fullWidth>
               <InputLabel>Select Item Received</InputLabel>
               <Select value={selectedItemId} label="Select Item Received" onChange={(e) => setSelectedItemId(e.target.value)}>
@@ -305,15 +310,18 @@ export default function StockInPage() {
               value={poNumber}
               onChange={(e) => setPoNumber(e.target.value)}
             />
+
+            <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
+              <Button variant="outlined" color="secondary" onClick={() => setModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="contained" color="success" onClick={handleSubmit}>
+                Record Stock In
+              </Button>
+            </Stack>
           </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setModalOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="success" onClick={handleSubmit}>
-            Record Stock In
-          </Button>
-        </DialogActions>
-      </Dialog>
+        </Box>
+      </Drawer>
     </MainCard>
   );
 }

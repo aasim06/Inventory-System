@@ -11,6 +11,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Drawer,
   FormControl,
   Grid,
   InputAdornment,
@@ -240,17 +241,20 @@ export default function StockOutPage() {
         </Table>
       </TableContainer>
 
-      {/* Modal: Record Stock Out */}
-      <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>📤 Record Stock Out (Usage)</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
+      {/* Drawer: Add Stock Out / Issue Item */}
+      <Drawer anchor="right" open={modalOpen} onClose={() => setModalOpen(false)}>
+        <Box sx={{ width: 420, p: 3 }}>
+          <Typography variant="h4" sx={{ mb: 3 }}>
+            📤 Issue Item (Store OUT)
+          </Typography>
+
+          <Stack spacing={2.5}>
             <FormControl fullWidth>
               <InputLabel>Select Item to Issue</InputLabel>
               <Select value={selectedItemId} label="Select Item to Issue" onChange={(e) => setSelectedItemId(e.target.value)}>
                 {items.map((i) => (
                   <MenuItem key={i.id} value={i.id}>
-                    {i.name} ({i.remainingStock} {i.unit} available)
+                    {i.name} ({i.remainingStock} {i.unit} in stock)
                   </MenuItem>
                 ))}
               </Select>
@@ -298,15 +302,18 @@ export default function StockOutPage() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
+
+            <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
+              <Button variant="outlined" color="secondary" onClick={() => setModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="contained" color="primary" onClick={handleSubmit}>
+                Record Stock Out
+              </Button>
+            </Stack>
           </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setModalOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="primary" onClick={handleSubmit}>
-            Record Stock Out
-          </Button>
-        </DialogActions>
-      </Dialog>
+        </Box>
+      </Drawer>
     </MainCard>
   );
 }
