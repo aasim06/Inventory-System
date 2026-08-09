@@ -43,7 +43,7 @@ import MainCard from 'components/MainCard';
 const UNIT_OPTIONS = ['PCS', 'KG', 'Liter', 'Meter', 'Set'];
 
 export default function ItemsPage() {
-  const { items, masterItemNames = [], issueStock, receiveStock, addNewItem, updateItem, deleteItem, deleteMultipleItems } = useStoreInventory();
+  const { items, masterItemNames = [], categories = [], issueStock, receiveStock, addNewItem, updateItem, deleteItem, deleteMultipleItems } = useStoreInventory();
 
   // Search & Category filter
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,7 +89,7 @@ export default function ItemsPage() {
   // Bulk Delete Confirmation Dialog State
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
-  const categories = ['All', ...new Set(items.map((i) => i.category))];
+  const categoryFilterOptions = ['All', ...new Set(items.map((i) => i.category))];
 
   const filteredItems = items.filter((i) => {
     const matchesSearch =
@@ -254,7 +254,7 @@ export default function ItemsPage() {
           <FormControl sx={{ minWidth: 240, width: 240 }}>
             <InputLabel>Category</InputLabel>
             <Select value={selectedCategory} label="Category" onChange={(e) => setSelectedCategory(e.target.value)}>
-              {categories.map((cat) => (
+              {categoryFilterOptions.map((cat) => (
                 <MenuItem key={cat} value={cat}>
                   {cat}
                 </MenuItem>
@@ -477,24 +477,16 @@ export default function ItemsPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Drawer 3: Add New Item */}
+      {/* Drawer 3: Add New Item (7 Inputs Form) */}
       <Drawer anchor="right" open={addDrawerOpen} onClose={() => setAddDrawerOpen(false)}>
         <Box sx={{ width: 420, p: 3 }}>
           <Typography variant="h4" sx={{ mb: 3 }}>
-            Add New Item to Store
+            ➕ Add New Item to Store
           </Typography>
 
           <form onSubmit={handleAddItemSubmit}>
             <Stack spacing={2.5}>
-              <TextField
-                label="Item Code / SKU"
-                fullWidth
-                required
-                value={newItem.itemCode}
-                onChange={(e) => setNewItem({ ...newItem, itemCode: e.target.value })}
-              />
-
-              {/* Autocomplete for Saved Master Item Names */}
+              {/* 1. Item Name */}
               <Autocomplete
                 freeSolo
                 options={masterItemNames.map((m) => m.name)}
@@ -511,76 +503,90 @@ export default function ItemsPage() {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Item Name (Select saved or type new)"
+                    label="Item Name"
                     required
-                    placeholder="Pick pre-saved item name or type new"
+                    placeholder="e.g. 3HP Electric Motor or type new"
                   />
                 )}
               />
 
+              {/* 2. SKU Code */}
               <TextField
-                label="Category"
+                label="SKU Code / Short ID"
                 fullWidth
-                value={newItem.category}
-                onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
+                required
+                placeholder="e.g. SKU-84564564"
+                value={newItem.itemCode}
+                onChange={(e) => setNewItem({ ...newItem, itemCode: e.target.value })}
               />
 
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <TextField
-                    label="Total Stock"
-                    type="number"
-                    fullWidth
-                    required
-                    value={newItem.totalStock}
-                    onChange={(e) => setNewItem({ ...newItem, totalStock: parseInt(e.target.value) || 0 })}
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    select
-                    id="itemUnit"
-                    label="Unit"
-                    fullWidth
-                    required
-                    value={newItem.unit}
-                    onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-                  >
-                    {UNIT_OPTIONS.map((option) => (
-                      <MenuItem key={option} value={option}>
-                        {option}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-              </Grid>
-
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <TextField
-                    label="Unit Price ($)"
-                    type="number"
-                    fullWidth
-                    value={newItem.unitPrice}
-                    onChange={(e) => setNewItem({ ...newItem, unitPrice: parseFloat(e.target.value) || 0 })}
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    label="Min Level"
-                    type="number"
-                    fullWidth
-                    value={newItem.minLevel}
-                    onChange={(e) => setNewItem({ ...newItem, minLevel: parseInt(e.target.value) || 5 })}
-                  />
-                </Grid>
-              </Grid>
-
+              {/* 3. Price Per Unit */}
               <TextField
-                label="Location"
+                label="Price Per Unit ($ / Rs)"
+                type="number"
                 fullWidth
-                value={newItem.rackLocation}
-                onChange={(e) => setNewItem({ ...newItem, rackLocation: e.target.value })}
+                required
+                inputProps={{ min: 0, step: 'any' }}
+                value={newItem.unitPrice}
+                onChange={(e) => setNewItem({ ...newItem, unitPrice: parseFloat(e.target.value) || 0 })}
+              />
+
+              {/* 4. Category */}
+              <TextField
+                select
+                label="Category"
+                fullWidth
+                required
+                value={newItem.category}
+                onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
+              >
+                {(categories.length > 0
+                  ? categories.map((c) => c.name)
+                  : ['Electrical & Motors', 'Mechanical Parts', 'Sensors & Automation', 'Hydraulics', 'Pneumatics', 'Raw Materials', 'General']
+                ).map((cat) => (
+                  <MenuItem key={cat} value={cat}>
+                    {cat}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              {/* 5. Units */}
+              <TextField
+                select
+                id="itemUnit"
+                label="Units"
+                fullWidth
+                required
+                value={newItem.unit}
+                onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
+              >
+                {UNIT_OPTIONS.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              {/* 6. Initial Stock Quantity */}
+              <TextField
+                label="Initial Stock Quantity"
+                type="number"
+                fullWidth
+                required
+                inputProps={{ min: 0 }}
+                value={newItem.totalStock}
+                onChange={(e) => setNewItem({ ...newItem, totalStock: parseInt(e.target.value) || 0 })}
+              />
+
+              {/* 7. Min Threshold */}
+              <TextField
+                label="Min Threshold (Low Stock Warning At)"
+                type="number"
+                fullWidth
+                required
+                inputProps={{ min: 1 }}
+                value={newItem.minLevel}
+                onChange={(e) => setNewItem({ ...newItem, minLevel: parseInt(e.target.value) || 5 })}
               />
 
               <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
@@ -596,7 +602,7 @@ export default function ItemsPage() {
         </Box>
       </Drawer>
 
-      {/* Drawer 4: Edit Item */}
+      {/* Drawer 4: Edit Item (7 Inputs Form) */}
       <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
         <Box sx={{ width: 420, p: 3 }}>
           <Typography variant="h4" sx={{ mb: 3 }}>
@@ -606,13 +612,7 @@ export default function ItemsPage() {
           {editingItem && (
             <form onSubmit={handleEditItemSubmit}>
               <Stack spacing={2.5}>
-                <TextField
-                  label="Item Code / SKU"
-                  fullWidth
-                  disabled
-                  value={editingItem.itemCode}
-                />
-
+                {/* 1. Item Name */}
                 <TextField
                   label="Item Name"
                   fullWidth
@@ -621,62 +621,83 @@ export default function ItemsPage() {
                   onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
                 />
 
+                {/* 2. SKU Code */}
                 <TextField
-                  label="Category"
+                  label="SKU Code / Short ID"
                   fullWidth
-                  value={editingItem.category}
-                  onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
+                  required
+                  value={editingItem.itemCode}
+                  onChange={(e) => setEditingItem({ ...editingItem, itemCode: e.target.value })}
                 />
 
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <TextField
-                      label="Total Stock"
-                      type="number"
-                      fullWidth
-                      required
-                      value={editingItem.totalStock}
-                      onChange={(e) => setEditingItem({ ...editingItem, totalStock: parseInt(e.target.value) || 0 })}
-                    />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <TextField
-                      select
-                      id="itemUnitEdit"
-                      label="Unit"
-                      fullWidth
-                      value={editingItem.unit}
-                      onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
-                    >
-                      {UNIT_OPTIONS.map((option) => (
-                        <MenuItem key={option} value={option}>
-                          {option}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-                </Grid>
+                {/* 3. Price Per Unit */}
+                <TextField
+                  label="Price Per Unit ($ / Rs)"
+                  type="number"
+                  fullWidth
+                  required
+                  inputProps={{ min: 0, step: 'any' }}
+                  value={editingItem.unitPrice}
+                  onChange={(e) => setEditingItem({ ...editingItem, unitPrice: parseFloat(e.target.value) || 0 })}
+                />
 
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <TextField
-                      label="Unit Price ($)"
-                      type="number"
-                      fullWidth
-                      value={editingItem.unitPrice}
-                      onChange={(e) => setEditingItem({ ...editingItem, unitPrice: parseFloat(e.target.value) || 0 })}
-                    />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <TextField
-                      label="Min Level"
-                      type="number"
-                      fullWidth
-                      value={editingItem.minLevel}
-                      onChange={(e) => setEditingItem({ ...editingItem, minLevel: parseInt(e.target.value) || 5 })}
-                    />
-                  </Grid>
-                </Grid>
+                {/* 4. Category */}
+                <TextField
+                  select
+                  label="Category"
+                  fullWidth
+                  required
+                  value={editingItem.category}
+                  onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
+                >
+                  {(categories.length > 0
+                    ? categories.map((c) => c.name)
+                    : ['Electrical & Motors', 'Mechanical Parts', 'Sensors & Automation', 'Hydraulics', 'Pneumatics', 'Raw Materials', 'General']
+                  ).map((cat) => (
+                    <MenuItem key={cat} value={cat}>
+                      {cat}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                {/* 5. Units */}
+                <TextField
+                  select
+                  id="itemUnitEdit"
+                  label="Units"
+                  fullWidth
+                  required
+                  value={editingItem.unit}
+                  onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
+                >
+                  {UNIT_OPTIONS.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                {/* 6. Initial Stock Quantity */}
+                <TextField
+                  label="Total Stock Quantity"
+                  type="number"
+                  fullWidth
+                  required
+                  inputProps={{ min: 0 }}
+                  value={editingItem.totalStock}
+                  onChange={(e) => setEditingItem({ ...editingItem, totalStock: parseInt(e.target.value) || 0 })}
+                />
+
+                {/* 7. Min Threshold */}
+                <TextField
+                  label="Min Threshold (Low Stock Warning At)"
+                  type="number"
+                  fullWidth
+                  required
+                  inputProps={{ min: 1 }}
+                  value={editingItem.minLevel}
+                  onChange={(e) => setEditingItem({ ...editingItem, minLevel: parseInt(e.target.value) || 5 })}
+                />
 
                 <TextField
                   label="Rack Location"
