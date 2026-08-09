@@ -6,6 +6,8 @@ import {
   ExportOutlined,
   TeamOutlined,
   BankOutlined,
+  EnvironmentOutlined,
+  AppstoreOutlined,
   HistoryOutlined,
   BarChartOutlined,
   PlusSquareOutlined
@@ -18,6 +20,8 @@ const icons = {
   ExportOutlined,
   TeamOutlined,
   BankOutlined,
+  EnvironmentOutlined,
+  AppstoreOutlined,
   HistoryOutlined,
   BarChartOutlined,
   PlusSquareOutlined
@@ -79,6 +83,20 @@ const inventoryMenu = {
       type: 'item',
       url: '/inventory/companies',
       icon: icons.BankOutlined
+    },
+    {
+      id: 'cities',
+      title: 'Cities',
+      type: 'item',
+      url: '/inventory/cities',
+      icon: icons.EnvironmentOutlined
+    },
+    {
+      id: 'categories',
+      title: 'Categories',
+      type: 'item',
+      url: '/inventory/categories',
+      icon: icons.AppstoreOutlined
     },
     {
       id: 'ledger',

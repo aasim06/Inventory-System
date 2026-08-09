@@ -15,6 +15,8 @@ const StockInPage = Loadable(lazy(() => import('pages/inventory/StockInPage')));
 const StockOutPage = Loadable(lazy(() => import('pages/inventory/StockOutPage')));
 const VendorsPage = Loadable(lazy(() => import('pages/inventory/VendorsPage')));
 const CompaniesPage = Loadable(lazy(() => import('pages/inventory/CompaniesPage')));
+const CitiesPage = Loadable(lazy(() => import('pages/inventory/CitiesPage')));
+const CategoriesPage = Loadable(lazy(() => import('pages/inventory/CategoriesPage')));
 const UsageLogPage = Loadable(lazy(() => import('pages/inventory/UsageLogPage')));
 const ReportsPage = Loadable(lazy(() => import('pages/inventory/ReportsPage')));
 
@@ -73,6 +75,14 @@ const MainRoutes = {
         {
           path: 'companies',
           element: <CompaniesPage />
+        },
+        {
+          path: 'cities',
+          element: <CitiesPage />
+        },
+        {
+          path: 'categories',
+          element: <CategoriesPage />
         },
         {
           path: 'ledger',

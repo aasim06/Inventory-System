@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect } from 'react';
-import { initialStoreItems, initialUsageLogs, initialVendors, initialCompanies } from 'data/factoryStoreData';
+import { initialStoreItems, initialUsageLogs, initialVendors, initialCompanies, initialCities, initialCategories } from 'data/factoryStoreData';
 import { supabase } from 'api/supabase';
 
 const StoreInventoryContext = createContext();
@@ -41,7 +41,19 @@ export function StoreInventoryProvider({ children }) {
     return saved ? JSON.parse(saved) : initialCompanies;
   });
 
-  // 5. Pre-saved Master Item Names List State
+  // 5. Cities State
+  const [cities, setCities] = useState(() => {
+    const saved = localStorage.getItem('store_cities');
+    return saved ? JSON.parse(saved) : initialCities;
+  });
+
+  // 6. Categories State
+  const [categories, setCategories] = useState(() => {
+    const saved = localStorage.getItem('store_categories');
+    return saved ? JSON.parse(saved) : initialCategories;
+  });
+
+  // 7. Pre-saved Master Item Names List State
   const [masterItemNames, setMasterItemNames] = useState(() => {
     const saved = localStorage.getItem('store_master_item_names');
     return saved ? JSON.parse(saved) : initialMasterItemNames;
@@ -63,6 +75,14 @@ export function StoreInventoryProvider({ children }) {
   useEffect(() => {
     localStorage.setItem('store_companies', JSON.stringify(companies));
   }, [companies]);
+
+  useEffect(() => {
+    localStorage.setItem('store_cities', JSON.stringify(cities));
+  }, [cities]);
+
+  useEffect(() => {
+    localStorage.setItem('store_categories', JSON.stringify(categories));
+  }, [categories]);
 
   useEffect(() => {
     localStorage.setItem('store_master_item_names', JSON.stringify(masterItemNames));
@@ -119,6 +139,28 @@ export function StoreInventoryProvider({ children }) {
             description: c.description
           }));
           setCompanies(mappedCompanies);
+        }
+
+        // Fetch Cities
+        const { data: dbCities, error: ctyErr } = await supabase.from('cities').select('*');
+        if (!ctyErr && dbCities && dbCities.length > 0) {
+          const mappedCities = dbCities.map((c) => ({
+            id: c.id,
+            name: c.name,
+            description: c.description
+          }));
+          setCities(mappedCities);
+        }
+
+        // Fetch Categories
+        const { data: dbCategories, error: catErr } = await supabase.from('categories').select('*');
+        if (!catErr && dbCategories && dbCategories.length > 0) {
+          const mappedCategories = dbCategories.map((c) => ({
+            id: c.id,
+            name: c.name,
+            description: c.description
+          }));
+          setCategories(mappedCategories);
         }
 
         // Fetch Master Item Names
@@ -591,6 +633,116 @@ export function StoreInventoryProvider({ children }) {
     }
   };
 
+  // 9. City Actions
+  const addCity = async (cityData) => {
+    const newCity = {
+      id: `CTY-${Math.floor(100 + Math.random() * 900)}`,
+      name: cityData.name,
+      description: cityData.description || ''
+    };
+    setCities((prev) => [newCity, ...prev]);
+
+    try {
+      await supabase.from('cities').insert([{
+        name: cityData.name,
+        description: cityData.description || ''
+      }]);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const updateCity = async (cityId, updatedData) => {
+    setCities((prev) =>
+      prev.map((c) => (c.id === cityId ? { ...c, ...updatedData } : c))
+    );
+
+    try {
+      await supabase.from('cities').update({
+        name: updatedData.name,
+        description: updatedData.description || ''
+      }).eq('id', cityId);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteCity = async (cityId) => {
+    setCities((prev) => prev.filter((c) => c.id !== cityId));
+
+    try {
+      await supabase.from('cities').delete().eq('id', cityId);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteMultipleCities = async (cityIds) => {
+    const idsSet = new Set(cityIds);
+    setCities((prev) => prev.filter((c) => !idsSet.has(c.id)));
+
+    try {
+      await supabase.from('cities').delete().in('id', cityIds);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // 10. Category Actions
+  const addCategory = async (categoryData) => {
+    const newCategory = {
+      id: `CAT-${Math.floor(100 + Math.random() * 900)}`,
+      name: categoryData.name,
+      description: categoryData.description || ''
+    };
+    setCategories((prev) => [newCategory, ...prev]);
+
+    try {
+      await supabase.from('categories').insert([{
+        name: categoryData.name,
+        description: categoryData.description || ''
+      }]);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const updateCategory = async (categoryId, updatedData) => {
+    setCategories((prev) =>
+      prev.map((c) => (c.id === categoryId ? { ...c, ...updatedData } : c))
+    );
+
+    try {
+      await supabase.from('categories').update({
+        name: updatedData.name,
+        description: updatedData.description || ''
+      }).eq('id', categoryId);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteCategory = async (categoryId) => {
+    setCategories((prev) => prev.filter((c) => c.id !== categoryId));
+
+    try {
+      await supabase.from('categories').delete().eq('id', categoryId);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteMultipleCategories = async (categoryIds) => {
+    const idsSet = new Set(categoryIds);
+    setCategories((prev) => prev.filter((c) => !idsSet.has(c.id)));
+
+    try {
+      await supabase.from('categories').delete().in('id', categoryIds);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Computed Metrics
   const totalInventoryCount = items.reduce((acc, i) => acc + i.remainingStock, 0);
   const totalValuation = items.reduce((acc, i) => acc + i.remainingStock * i.unitPrice, 0);
@@ -608,6 +760,8 @@ export function StoreInventoryProvider({ children }) {
         usageLogs,
         vendors,
         companies,
+        cities,
+        categories,
         masterItemNames,
         totalInventoryCount,
         totalValuation,
@@ -629,6 +783,14 @@ export function StoreInventoryProvider({ children }) {
         updateCompany,
         deleteCompany,
         deleteMultipleCompanies,
+        addCity,
+        updateCity,
+        deleteCity,
+        deleteMultipleCities,
+        addCategory,
+        updateCategory,
+        deleteCategory,
+        deleteMultipleCategories,
         deleteMultipleLogs,
         addMasterItemName,
         updateMasterItemName,
