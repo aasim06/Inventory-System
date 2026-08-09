@@ -14,6 +14,7 @@ const AddItemNamePage = Loadable(lazy(() => import('pages/inventory/AddItemNameP
 const StockInPage = Loadable(lazy(() => import('pages/inventory/StockInPage')));
 const StockOutPage = Loadable(lazy(() => import('pages/inventory/StockOutPage')));
 const VendorsPage = Loadable(lazy(() => import('pages/inventory/VendorsPage')));
+const CompaniesPage = Loadable(lazy(() => import('pages/inventory/CompaniesPage')));
 const UsageLogPage = Loadable(lazy(() => import('pages/inventory/UsageLogPage')));
 const ReportsPage = Loadable(lazy(() => import('pages/inventory/ReportsPage')));
 
@@ -68,6 +69,10 @@ const MainRoutes = {
         {
           path: 'vendors',
           element: <VendorsPage />
+        },
+        {
+          path: 'companies',
+          element: <CompaniesPage />
         },
         {
           path: 'ledger',

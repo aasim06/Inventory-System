@@ -1,4 +1,15 @@
-// ==============================|| FACTORY STORE INVENTORY MOCK DATA ||============================== //
+export const initialCompanies = [
+  {
+    id: 'CMP-1',
+    name: 'Atlas Industrial Corp',
+    description: 'Primary supplier for electrical motors and automation components'
+  },
+  {
+    id: 'CMP-2',
+    name: 'Siemens Pakistan Ltd',
+    description: 'Authorized distributor for PLC modules and industrial sensors'
+  }
+];
 
 export const initialStoreItems = [
   {

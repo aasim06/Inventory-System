@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect } from 'react';
-import { initialStoreItems, initialUsageLogs, initialVendors } from 'data/factoryStoreData';
+import { initialStoreItems, initialUsageLogs, initialVendors, initialCompanies } from 'data/factoryStoreData';
 import { supabase } from 'api/supabase';
 
 const StoreInventoryContext = createContext();
@@ -35,7 +35,13 @@ export function StoreInventoryProvider({ children }) {
     return saved ? JSON.parse(saved) : initialVendors;
   });
 
-  // 4. Pre-saved Master Item Names List State
+  // 4. Companies State
+  const [companies, setCompanies] = useState(() => {
+    const saved = localStorage.getItem('store_companies');
+    return saved ? JSON.parse(saved) : initialCompanies;
+  });
+
+  // 5. Pre-saved Master Item Names List State
   const [masterItemNames, setMasterItemNames] = useState(() => {
     const saved = localStorage.getItem('store_master_item_names');
     return saved ? JSON.parse(saved) : initialMasterItemNames;
@@ -53,6 +59,10 @@ export function StoreInventoryProvider({ children }) {
   useEffect(() => {
     localStorage.setItem('store_vendors', JSON.stringify(vendors));
   }, [vendors]);
+
+  useEffect(() => {
+    localStorage.setItem('store_companies', JSON.stringify(companies));
+  }, [companies]);
 
   useEffect(() => {
     localStorage.setItem('store_master_item_names', JSON.stringify(masterItemNames));
@@ -98,6 +108,17 @@ export function StoreInventoryProvider({ children }) {
             rating: v.rating
           }));
           setVendors(mappedVendors);
+        }
+
+        // Fetch Companies
+        const { data: dbCompanies, error: cmpErr } = await supabase.from('companies').select('*');
+        if (!cmpErr && dbCompanies && dbCompanies.length > 0) {
+          const mappedCompanies = dbCompanies.map((c) => ({
+            id: c.id,
+            name: c.name,
+            description: c.description
+          }));
+          setCompanies(mappedCompanies);
         }
 
         // Fetch Master Item Names
@@ -515,6 +536,61 @@ export function StoreInventoryProvider({ children }) {
     }
   };
 
+  // 8. Company Actions
+  const addCompany = async (companyData) => {
+    const newCompany = {
+      id: `CMP-${Math.floor(100 + Math.random() * 900)}`,
+      name: companyData.name,
+      description: companyData.description || ''
+    };
+    setCompanies((prev) => [newCompany, ...prev]);
+
+    try {
+      await supabase.from('companies').insert([{
+        name: companyData.name,
+        description: companyData.description || ''
+      }]);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const updateCompany = async (companyId, updatedData) => {
+    setCompanies((prev) =>
+      prev.map((c) => (c.id === companyId ? { ...c, ...updatedData } : c))
+    );
+
+    try {
+      await supabase.from('companies').update({
+        name: updatedData.name,
+        description: updatedData.description || ''
+      }).eq('id', companyId);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteCompany = async (companyId) => {
+    setCompanies((prev) => prev.filter((c) => c.id !== companyId));
+
+    try {
+      await supabase.from('companies').delete().eq('id', companyId);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteMultipleCompanies = async (companyIds) => {
+    const idsSet = new Set(companyIds);
+    setCompanies((prev) => prev.filter((c) => !idsSet.has(c.id)));
+
+    try {
+      await supabase.from('companies').delete().in('id', companyIds);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Computed Metrics
   const totalInventoryCount = items.reduce((acc, i) => acc + i.remainingStock, 0);
   const totalValuation = items.reduce((acc, i) => acc + i.remainingStock * i.unitPrice, 0);
@@ -531,6 +607,7 @@ export function StoreInventoryProvider({ children }) {
         items,
         usageLogs,
         vendors,
+        companies,
         masterItemNames,
         totalInventoryCount,
         totalValuation,
@@ -548,6 +625,10 @@ export function StoreInventoryProvider({ children }) {
         updateVendor,
         deleteVendor,
         deleteMultipleVendors,
+        addCompany,
+        updateCompany,
+        deleteCompany,
+        deleteMultipleCompanies,
         deleteMultipleLogs,
         addMasterItemName,
         updateMasterItemName,

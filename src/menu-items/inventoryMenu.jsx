@@ -5,6 +5,7 @@ import {
   ImportOutlined,
   ExportOutlined,
   TeamOutlined,
+  BankOutlined,
   HistoryOutlined,
   BarChartOutlined,
   PlusSquareOutlined
@@ -16,6 +17,7 @@ const icons = {
   ImportOutlined,
   ExportOutlined,
   TeamOutlined,
+  BankOutlined,
   HistoryOutlined,
   BarChartOutlined,
   PlusSquareOutlined
@@ -70,6 +72,13 @@ const inventoryMenu = {
       type: 'item',
       url: '/inventory/vendors',
       icon: icons.TeamOutlined
+    },
+    {
+      id: 'companies',
+      title: 'Companies',
+      type: 'item',
+      url: '/inventory/companies',
+      icon: icons.BankOutlined
     },
     {
       id: 'ledger',
