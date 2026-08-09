@@ -40,8 +40,6 @@ export default function StockInPage() {
   const { items, usageLogs, receiveStock } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
   const [selected, setSelected] = useState([]);
 
   // Stock In Modal State
@@ -51,7 +49,7 @@ export default function StockInPage() {
   const [supplierName, setSupplierName] = useState('Siemens Industrial');
   const [poNumber, setPoNumber] = useState('PO-9982');
 
-  // Filter logs for IN transactions & date range
+  // Filter logs for IN transactions
   const stockInLogs = usageLogs.filter((log) => {
     const isIN = log.type.includes('IN');
     const matchesSearch =
@@ -59,14 +57,7 @@ export default function StockInPage() {
       log.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.usedBy.toLowerCase().includes(searchTerm.toLowerCase());
 
-    let matchesDate = true;
-    if (log.dateISO) {
-      const logDay = log.dateISO.split('T')[0];
-      if (startDate && logDay < startDate) matchesDate = false;
-      if (endDate && logDay > endDate) matchesDate = false;
-    }
-
-    return isIN && matchesSearch && matchesDate;
+    return isIN && matchesSearch;
   });
 
   // Checkbox Handlers
@@ -104,12 +95,6 @@ export default function StockInPage() {
     setModalOpen(false);
   };
 
-  const handleResetFilters = () => {
-    setSearchTerm('');
-    setStartDate('');
-    setEndDate('');
-  };
-
   return (
     <MainCard
       title="Stock In (Shipments Received)"
@@ -119,9 +104,9 @@ export default function StockInPage() {
         </Button>
       }
     >
-      {/* Search Bar & Date Filter Controls */}
+      {/* Search Bar Controls */}
       <Grid container spacing={2} sx={{ mb: 3, alignItems: 'center' }}>
-        <Grid item xs={12} md={5}>
+        <Grid item xs={12} sm={6}>
           <OutlinedInput
             fullWidth
             placeholder="Search Stock In logs by Item Name, SKU Code, Supplier..."
@@ -135,35 +120,8 @@ export default function StockInPage() {
           />
         </Grid>
 
-        <Grid item xs={6} sm={4} md={2.5}>
-          <TextField
-            label="From Date"
-            type="date"
-            fullWidth
-            slotProps={{ inputLabel: { shrink: true } }}
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-        </Grid>
-
-        <Grid item xs={6} sm={4} md={2.5}>
-          <TextField
-            label="To Date"
-            type="date"
-            fullWidth
-            slotProps={{ inputLabel: { shrink: true } }}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
-        </Grid>
-
-        <Grid item xs={12} sm={4} md={2} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
-          {(startDate || endDate || searchTerm) && (
-            <Button size="small" variant="outlined" color="secondary" startIcon={<ReloadOutlined />} onClick={handleResetFilters} sx={{ mb: 0.5 }}>
-              Reset
-            </Button>
-          )}
-          <Typography variant="caption" color="textSecondary" display="block">
+        <Grid item xs={12} sm={6} sx={{ textAlign: 'right' }}>
+          <Typography variant="caption" color="textSecondary">
             {selected.length > 0 ? (
               <strong style={{ color: '#52c41a' }}>{selected.length} selected</strong>
             ) : (
