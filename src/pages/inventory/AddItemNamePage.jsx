@@ -16,6 +16,7 @@ import {
   Grid,
   IconButton,
   InputAdornment,
+  MenuItem,
   OutlinedInput,
   Stack,
   Table,
@@ -35,6 +36,8 @@ import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, PlusSquareO
 // project imports
 import MainCard from 'components/MainCard';
 
+const UNIT_OPTIONS = ['PCS', 'KG', 'Liter', 'Meter', 'Set'];
+
 export default function AddItemNamePage() {
   const { items, masterItemNames, addMasterItemName, updateMasterItemName, deleteMasterItemName, deleteMultipleMasterItemNames } = useStoreInventory();
 
@@ -46,7 +49,7 @@ export default function AddItemNamePage() {
   const [newItemName, setNewItemName] = useState({
     name: '',
     category: 'Electrical & Motors',
-    defaultUnit: 'pcs'
+    defaultUnit: 'PCS'
   });
 
   // Edit Master Item Drawer State
@@ -317,12 +320,19 @@ export default function AddItemNamePage() {
               />
 
               <TextField
+                select
+                id="itemUnit"
                 label="Default Measurement Unit"
                 fullWidth
-                placeholder="e.g. pcs, kg, meters, boxes"
                 value={newItemName.defaultUnit}
                 onChange={(e) => setNewItemName({ ...newItemName, defaultUnit: e.target.value })}
-              />
+              >
+                {UNIT_OPTIONS.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
 
               <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
                 <Button variant="outlined" color="secondary" onClick={() => setAddDrawerOpen(false)}>
@@ -370,11 +380,19 @@ export default function AddItemNamePage() {
                 />
 
                 <TextField
+                  select
+                  id="itemUnitEdit"
                   label="Default Unit"
                   fullWidth
                   value={editingItemName.defaultUnit}
                   onChange={(e) => setEditingItemName({ ...editingItemName, defaultUnit: e.target.value })}
-                />
+                >
+                  {UNIT_OPTIONS.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </TextField>
 
                 <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
                   <Button variant="outlined" color="secondary" onClick={() => setEditDrawerOpen(false)}>

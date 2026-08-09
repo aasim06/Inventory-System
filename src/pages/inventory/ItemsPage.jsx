@@ -40,6 +40,8 @@ import { PlusOutlined, SearchOutlined, ImportOutlined, ExportOutlined, DeleteOut
 // project imports
 import MainCard from 'components/MainCard';
 
+const UNIT_OPTIONS = ['PCS', 'KG', 'Liter', 'Meter', 'Set'];
+
 export default function ItemsPage() {
   const { items, masterItemNames = [], issueStock, receiveStock, addNewItem, updateItem, deleteItem, deleteMultipleItems } = useStoreInventory();
 
@@ -70,7 +72,7 @@ export default function ItemsPage() {
     name: '',
     category: 'Electrical & Motors',
     totalStock: 50,
-    unit: 'pcs',
+    unit: 'PCS',
     unitPrice: 25,
     minLevel: 10,
     rackLocation: 'Rack A-01'
@@ -536,12 +538,20 @@ export default function ItemsPage() {
                 </Grid>
                 <Grid item xs={6}>
                   <TextField
-                    label="Unit (pcs, kg, etc.)"
+                    select
+                    id="itemUnit"
+                    label="Unit"
                     fullWidth
                     required
                     value={newItem.unit}
                     onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-                  />
+                  >
+                    {UNIT_OPTIONS.map((option) => (
+                      <MenuItem key={option} value={option}>
+                        {option}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 </Grid>
               </Grid>
 
@@ -631,11 +641,19 @@ export default function ItemsPage() {
                   </Grid>
                   <Grid item xs={6}>
                     <TextField
+                      select
+                      id="itemUnitEdit"
                       label="Unit"
                       fullWidth
                       value={editingItem.unit}
                       onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
-                    />
+                    >
+                      {UNIT_OPTIONS.map((option) => (
+                        <MenuItem key={option} value={option}>
+                          {option}
+                        </MenuItem>
+                      ))}
+                    </TextField>
                   </Grid>
                 </Grid>
 
