@@ -3,14 +3,11 @@ import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
 import {
+  Autocomplete,
   Box,
   Button,
   Checkbox,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Drawer,
   FormControl,
   Grid,
@@ -31,23 +28,73 @@ import {
 } from '@mui/material';
 
 // icons
-import { ImportOutlined, SearchOutlined, ArrowUpOutlined, ReloadOutlined } from '@ant-design/icons';
+import { ImportOutlined, SearchOutlined, ArrowUpOutlined } from '@ant-design/icons';
 
 // project imports
 import MainCard from 'components/MainCard';
 
+const UNIT_OPTIONS = ['PCS', 'KG', 'Liter', 'Meter', 'Set'];
+
+const DEFAULT_CATEGORIES = [
+  'General',
+  'Electrical & Motors',
+  'Mechanical Parts',
+  'Sensors & Automation',
+  'Hydraulics',
+  'Pneumatics',
+  'Raw Materials',
+  'Fasteners & Hardware'
+];
+
 export default function StockInPage() {
-  const { items, usageLogs, receiveStock } = useStoreInventory();
+  const { items = [], masterItemNames = [], categories = [], usageLogs = [], receiveStock, addNewItem } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selected, setSelected] = useState([]);
 
-  // Stock In Modal State
+  // Available categories list
+  const categoryOptions = categories.length > 0 ? categories.map((c) => c.name) : DEFAULT_CATEGORIES;
+
+  // Combine items & masterItemNames for autocomplete options
+  const existingNamesList = Array.from(
+    new Set([
+      ...items.map((i) => i.name),
+      ...masterItemNames.map((m) => m.name)
+    ])
+  );
+
+  // Stock In Drawer Form State (6 Inputs)
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedItemId, setSelectedItemId] = useState(items[0]?.id || '');
-  const [qtyReceived, setQtyReceived] = useState(20);
-  const [supplierName, setSupplierName] = useState('Siemens Industrial');
-  const [poNumber, setPoNumber] = useState('PO-9982');
+  const [form, setForm] = useState({
+    itemName: '',
+    itemCode: `RM-${Math.floor(100 + Math.random() * 900)}`,
+    category: 'General',
+    unit: 'PCS',
+    startingStock: 50,
+    lowStockWarningAt: 10
+  });
+
+  // Handle Item Name Selection
+  const handleItemNameChange = (event, newValue) => {
+    const selectedName = newValue || '';
+    const matchedItem = items.find((i) => i.name.toLowerCase() === selectedName.toLowerCase());
+
+    if (matchedItem) {
+      setForm((prev) => ({
+        ...prev,
+        itemName: matchedItem.name,
+        itemCode: matchedItem.itemCode || prev.itemCode,
+        category: matchedItem.category || prev.category,
+        unit: matchedItem.unit || 'PCS',
+        lowStockWarningAt: matchedItem.minLevel || prev.lowStockWarningAt
+      }));
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        itemName: selectedName
+      }));
+    }
+  };
 
   // Filter logs for IN transactions
   const stockInLogs = usageLogs.filter((log) => {
@@ -55,7 +102,7 @@ export default function StockInPage() {
     const matchesSearch =
       log.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.usedBy.toLowerCase().includes(searchTerm.toLowerCase());
+      (log.usedBy && log.usedBy.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return isIN && matchesSearch;
   });
@@ -89,9 +136,45 @@ export default function StockInPage() {
 
   const isSelected = (id) => selected.indexOf(id) !== -1;
 
-  const handleSubmit = () => {
-    if (!selectedItemId) return;
-    receiveStock(selectedItemId, qtyReceived, supplierName, poNumber);
+  // Handle Submit (Record Stock In)
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.itemName.trim()) return;
+
+    // Check if item already exists in items
+    const existingItem = items.find(
+      (i) => i.itemCode.toLowerCase() === form.itemCode.toLowerCase() || i.name.toLowerCase() === form.itemName.toLowerCase()
+    );
+
+    if (existingItem) {
+      // Receive stock for existing item
+      receiveStock(existingItem.id, form.startingStock, 'Shipment Inward', `PO-${Math.floor(1000 + Math.random() * 9000)}`);
+    } else {
+      // Create new store item & receive stock
+      addNewItem({
+        name: form.itemName,
+        itemCode: form.itemCode || `RM-${Math.floor(100 + Math.random() * 900)}`,
+        category: form.category,
+        unit: form.unit,
+        totalStock: parseInt(form.startingStock) || 1,
+        minLevel: parseInt(form.lowStockWarningAt) || 10,
+        unitPrice: 0,
+        rackLocation: 'Main Store'
+      });
+
+      // Record inward log
+      receiveStock(form.itemCode, form.startingStock, 'Shipment Inward', `PO-${Math.floor(1000 + Math.random() * 9000)}`);
+    }
+
+    // Reset Form & Close Drawer
+    setForm({
+      itemName: '',
+      itemCode: `RM-${Math.floor(100 + Math.random() * 900)}`,
+      category: 'General',
+      unit: 'PCS',
+      startingStock: 50,
+      lowStockWarningAt: 10
+    });
     setModalOpen(false);
   };
 
@@ -205,7 +288,7 @@ export default function StockInPage() {
                     </TableCell>
 
                     <TableCell>
-                      <Chip label={log.usedBy} size="small" color="success" variant="light" />
+                      <Chip label={log.usedBy || 'Shipment'} size="small" color="success" variant="light" />
                     </TableCell>
 
                     <TableCell>
@@ -227,57 +310,107 @@ export default function StockInPage() {
         </Table>
       </TableContainer>
 
-      {/* Drawer: Add Stock In */}
+      {/* Drawer: Add Stock In (6 Inputs Form) */}
       <Drawer anchor="right" open={modalOpen} onClose={() => setModalOpen(false)}>
         <Box sx={{ width: 420, p: 3 }}>
           <Typography variant="h4" sx={{ mb: 3 }}>
-            📥 Add Stock In (Receive Shipment)
+            📥 Add Stock In
           </Typography>
 
-          <Stack spacing={2.5}>
-            <FormControl fullWidth>
-              <InputLabel>Select Item Received</InputLabel>
-              <Select value={selectedItemId} label="Select Item Received" onChange={(e) => setSelectedItemId(e.target.value)}>
-                {items.map((i) => (
-                  <MenuItem key={i.id} value={i.id}>
-                    {i.name} ({i.remainingStock} {i.unit} in stock)
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={2.5}>
+              {/* 1. Item Name */}
+              <Autocomplete
+                freeSolo
+                options={existingNamesList}
+                value={form.itemName}
+                onInputChange={(event, newInputValue) => handleItemNameChange(event, newInputValue)}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Item Name"
+                    required
+                    placeholder="e.g. 3HP Electric Motor or type new"
+                  />
+                )}
+              />
+
+              {/* 2. Item Code */}
+              <TextField
+                label="Item Code (Short ID)"
+                fullWidth
+                required
+                placeholder="e.g. RM-001"
+                value={form.itemCode}
+                onChange={(e) => setForm({ ...form, itemCode: e.target.value })}
+              />
+
+              {/* 3. Category */}
+              <TextField
+                select
+                label="Category"
+                fullWidth
+                required
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+              >
+                {categoryOptions.map((cat) => (
+                  <MenuItem key={cat} value={cat}>
+                    {cat}
                   </MenuItem>
                 ))}
-              </Select>
-            </FormControl>
+              </TextField>
 
-            <TextField
-              label="Quantity Received"
-              type="number"
-              fullWidth
-              inputProps={{ min: 1 }}
-              value={qtyReceived}
-              onChange={(e) => setQtyReceived(Math.max(1, parseInt(e.target.value) || 1))}
-            />
+              {/* 4. Unit */}
+              <TextField
+                select
+                id="itemUnit"
+                label="Unit"
+                fullWidth
+                required
+                value={form.unit}
+                onChange={(e) => setForm({ ...form, unit: e.target.value })}
+              >
+                {UNIT_OPTIONS.map((opt) => (
+                  <MenuItem key={opt} value={opt}>
+                    {opt}
+                  </MenuItem>
+                ))}
+              </TextField>
 
-            <TextField
-              label="Supplier / Vendor Name"
-              fullWidth
-              value={supplierName}
-              onChange={(e) => setSupplierName(e.target.value)}
-            />
+              {/* 5. Starting Stock / Quantity Received */}
+              <TextField
+                label="Starting Stock (Quantity Received)"
+                type="number"
+                fullWidth
+                required
+                inputProps={{ min: 1 }}
+                value={form.startingStock}
+                onChange={(e) => setForm({ ...form, startingStock: parseInt(e.target.value) || 1 })}
+              />
 
-            <TextField
-              label="PO Ref Number / Delivery Challan"
-              fullWidth
-              value={poNumber}
-              onChange={(e) => setPoNumber(e.target.value)}
-            />
+              {/* 6. Low Stock Warning At */}
+              <TextField
+                label="Low Stock Warning At (Min Level)"
+                type="number"
+                fullWidth
+                required
+                inputProps={{ min: 1 }}
+                value={form.lowStockWarningAt}
+                onChange={(e) => setForm({ ...form, lowStockWarningAt: parseInt(e.target.value) || 1 })}
+              />
 
-            <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
-              <Button variant="outlined" color="secondary" onClick={() => setModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="contained" color="success" onClick={handleSubmit}>
-                Record Stock In
-              </Button>
+              {/* Action Buttons */}
+              <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
+                <Button variant="outlined" color="secondary" onClick={() => setModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button variant="contained" color="success" type="submit">
+                  Record Stock In
+                </Button>
+              </Stack>
             </Stack>
-          </Stack>
+          </form>
         </Box>
       </Drawer>
     </MainCard>
