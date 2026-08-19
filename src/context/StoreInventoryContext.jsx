@@ -1058,7 +1058,7 @@ const initialMachineModels = [
   };
 
   // ----------------------------------------------------
-  // FULL BACKUP EXPORT & IMPORT ACTIONS
+  // FULL BACKUP EXPORT & IMPORT & RESET ACTIONS
   // ----------------------------------------------------
   const exportFullBackupData = () => {
     const backupObj = {
@@ -1099,6 +1099,24 @@ const initialMachineModels = [
     }
   };
 
+  const resetAllDataToZero = () => {
+    localStorage.removeItem('store_inventory_items');
+    localStorage.removeItem('store_usage_logs');
+    localStorage.removeItem('store_vendors');
+    localStorage.removeItem('store_machine_sales');
+    localStorage.removeItem('store_customer_payments');
+    localStorage.removeItem('store_vendor_payments');
+
+    setItems([]);
+    setUsageLogs([]);
+    setVendors([]);
+    setMachineSales([]);
+    setCustomerPayments([]);
+    setVendorPayments([]);
+
+    return { success: true, message: 'All demo data reset to 0! System is now clean.' };
+  };
+
   // Computed Metrics
   const totalInventoryCount = items.reduce((acc, i) => acc + i.remainingStock, 0);
   const totalValuation = items.reduce((acc, i) => acc + i.remainingStock * i.unitPrice, 0);
@@ -1130,6 +1148,7 @@ const initialMachineModels = [
         addVendorPayment,
         exportFullBackupData,
         importFullBackupData,
+        resetAllDataToZero,
         totalInventoryCount,
         totalValuation,
         dailyUsageCount: todayStockOutQty,

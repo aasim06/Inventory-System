@@ -6,11 +6,17 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Alert from '@mui/material/Alert';
 
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+
 // ant design icons
 import DownloadOutlined from '@ant-design/icons/DownloadOutlined';
 import UploadOutlined from '@ant-design/icons/UploadOutlined';
 import SafetyCertificateOutlined from '@ant-design/icons/SafetyCertificateOutlined';
 import CheckCircleOutlined from '@ant-design/icons/CheckCircleOutlined';
+import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 
 import MainCard from 'components/MainCard';
 import { useStoreInventory } from 'context/StoreInventoryContext';
@@ -24,10 +30,18 @@ export default function BackupRestorePage() {
     customerPayments,
     vendorPayments,
     exportFullBackupData,
-    importFullBackupData
+    importFullBackupData,
+    resetAllDataToZero
   } = useStoreInventory();
 
   const [restoreStatus, setRestoreStatus] = useState(null);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+
+  const handleResetData = () => {
+    const res = resetAllDataToZero();
+    setRestoreStatus({ type: 'success', message: res.message });
+    setResetConfirmOpen(false);
+  };
 
   // 1-Click Backup Export Handler
   const handleDownloadBackup = () => {
@@ -176,7 +190,47 @@ export default function BackupRestorePage() {
             </Button>
           </MainCard>
         </Grid>
+
+        {/* Reset System Data Card */}
+        <Grid item xs={12}>
+          <MainCard sx={{ border: '1px solid #fecaca', bgcolor: '#fef2f2', mt: 1 }}>
+            <Typography variant="h4" fontWeight={800} color="#dc2626" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <DeleteOutlined /> Reset All System Data to Zero (Fresh Start)
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+              Clear all demo items, test sales, stock logs, and customer ledgers to start fresh with a clean zero system.
+            </Typography>
+            <Button
+              variant="contained"
+              color="error"
+              size="large"
+              startIcon={<DeleteOutlined />}
+              onClick={() => setResetConfirmOpen(true)}
+              sx={{ fontWeight: 800, py: 1.2, px: 3 }}
+            >
+              Reset All Data to Zero
+            </Button>
+          </MainCard>
+        </Grid>
       </Grid>
+
+      {/* Confirm Reset Dialog */}
+      <Dialog open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)}>
+        <DialogTitle sx={{ fontWeight: 800, color: 'error.main' }}>
+          ⚠️ Reset All System Data to Zero?
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            Are you sure you want to clear all store items, stock logs, customer ledgers, and vendor transactions? This action will set all system metrics to 0 for a fresh start.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setResetConfirmOpen(false)} color="secondary">Cancel</Button>
+          <Button onClick={handleResetData} color="error" variant="contained" sx={{ fontWeight: 800 }}>
+            Yes, Reset All Data to 0
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
