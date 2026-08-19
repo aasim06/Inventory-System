@@ -17,61 +17,61 @@ const initialMasterItemNames = [
 ];
 
 export function StoreInventoryProvider({ children }) {
-  // 1. Inventory Items State (Auto-clean ghost duplicates created during earlier test)
+  // Clear old legacy demo cache on mount if present
+  useEffect(() => {
+    const legacyKeys = [
+      'store_inventory_items',
+      'store_usage_logs',
+      'store_vendors',
+      'store_machine_sales',
+      'store_customer_payments',
+      'store_vendor_payments'
+    ];
+    legacyKeys.forEach((key) => localStorage.removeItem(key));
+  }, []);
+
+  // 1. Inventory Items State (Clean Zero Start)
   const [items, setItems] = useState(() => {
-    const saved = localStorage.getItem('store_inventory_items');
-    const parsed = saved ? JSON.parse(saved) : initialStoreItems;
-    const seen = new Set();
-    return parsed.filter((item) => {
-      if (item.totalStock === 0 && item.unitPrice === 0 && item.remainingStock === 0) {
-        const key = `${(item.name || '').toLowerCase()}_zero`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-      }
-      return true;
-    });
+    const saved = localStorage.getItem('rehmat_store_items_v2');
+    return saved ? JSON.parse(saved) : [];
   });
 
-  // 2. Usage & Issue Logs State
+  // 2. Usage & Issue Logs State (Clean Zero Start)
   const [usageLogs, setUsageLogs] = useState(() => {
-    const saved = localStorage.getItem('store_usage_logs');
-    return saved ? JSON.parse(saved) : initialUsageLogs;
+    const saved = localStorage.getItem('rehmat_store_usage_logs_v2');
+    return saved ? JSON.parse(saved) : [];
   });
 
-  // 3. Vendors / Suppliers State
+  // 3. Vendors / Suppliers State (Clean Zero Start)
   const [vendors, setVendors] = useState(() => {
-    const saved = localStorage.getItem('store_vendors');
-    return saved ? JSON.parse(saved) : initialVendors;
+    const saved = localStorage.getItem('rehmat_store_vendors_v2');
+    return saved ? JSON.parse(saved) : [];
   });
 
   // 4. Categories State
   const [categories, setCategories] = useState(() => {
-    const saved = localStorage.getItem('store_categories');
+    const saved = localStorage.getItem('rehmat_store_categories_v2');
     return saved ? JSON.parse(saved) : initialCategories;
   });
 
   // 7. Pre-saved Master Item Names List State
   const [masterItemNames, setMasterItemNames] = useState(() => {
-    const saved = localStorage.getItem('store_master_item_names');
+    const saved = localStorage.getItem('rehmat_store_master_item_names_v2');
     return saved ? JSON.parse(saved) : initialMasterItemNames;
   });
 
-const initialMachineModels = [
-  'Rehmat 20" Lawn Mower (Petrol Engine)',
-  'Rehmat Electric Lawn Cutter 18"',
-  'Rehmat Heavy Duty Lawn Mower 24"',
-  'Rehmat Grass Trimmer & Cutter 2-Stroke',
-  'Rehmat Hand Push Lawn Roller Mower'
-];
+  const initialMachineModels = [
+    'Rehmat 20" Lawn Mower (Petrol Engine)',
+    'Rehmat Electric Lawn Cutter 18"',
+    'Rehmat Heavy Duty Lawn Mower 24"',
+    'Rehmat Grass Trimmer & Cutter 2-Stroke',
+    'Rehmat Hand Push Lawn Roller Mower'
+  ];
 
-  // 8. Customer Machine Sales State
+  // 8. Customer Machine Sales State (Clean Zero Start)
   const [machineSales, setMachineSales] = useState(() => {
-    const saved = localStorage.getItem('store_machine_sales');
-    const parsed = saved ? JSON.parse(saved) : null;
-    if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
-    }
-    return initialMachineSales;
+    const saved = localStorage.getItem('rehmat_store_machine_sales_v2');
+    return saved ? JSON.parse(saved) : [];
   });
 
   // 9. Master Machine Models Catalog State
@@ -113,53 +113,53 @@ const initialMachineModels = [
     ];
   });
 
-  // 11. Customer Payments & Ledger Entries State
+  // 11. Customer Payments & Ledger Entries State (Clean Zero Start)
   const [customerPayments, setCustomerPayments] = useState(() => {
-    const saved = localStorage.getItem('store_customer_payments');
+    const saved = localStorage.getItem('rehmat_store_customer_payments_v2');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // 12. Vendor Payments & Ledger Entries State
+  // 12. Vendor Payments & Ledger Entries State (Clean Zero Start)
   const [vendorPayments, setVendorPayments] = useState(() => {
-    const saved = localStorage.getItem('store_vendor_payments');
+    const saved = localStorage.getItem('rehmat_store_vendor_payments_v2');
     return saved ? JSON.parse(saved) : [];
   });
 
   // Sync state to LocalStorage as secondary backup
   useEffect(() => {
-    localStorage.setItem('store_inventory_items', JSON.stringify(items));
+    localStorage.setItem('rehmat_store_items_v2', JSON.stringify(items));
   }, [items]);
 
   useEffect(() => {
-    localStorage.setItem('store_machine_sales', JSON.stringify(machineSales));
+    localStorage.setItem('rehmat_store_machine_sales_v2', JSON.stringify(machineSales));
   }, [machineSales]);
 
   useEffect(() => {
-    localStorage.setItem('store_usage_logs', JSON.stringify(usageLogs));
+    localStorage.setItem('rehmat_store_usage_logs_v2', JSON.stringify(usageLogs));
   }, [usageLogs]);
 
   useEffect(() => {
-    localStorage.setItem('store_vendors', JSON.stringify(vendors));
+    localStorage.setItem('rehmat_store_vendors_v2', JSON.stringify(vendors));
   }, [vendors]);
 
   useEffect(() => {
-    localStorage.setItem('store_categories', JSON.stringify(categories));
+    localStorage.setItem('rehmat_store_categories_v2', JSON.stringify(categories));
   }, [categories]);
 
   useEffect(() => {
-    localStorage.setItem('store_master_item_names', JSON.stringify(masterItemNames));
+    localStorage.setItem('rehmat_store_master_item_names_v2', JSON.stringify(masterItemNames));
   }, [masterItemNames]);
 
   useEffect(() => {
-    localStorage.setItem('store_machine_recipes', JSON.stringify(machineRecipes));
+    localStorage.setItem('rehmat_store_machine_recipes_v2', JSON.stringify(machineRecipes));
   }, [machineRecipes]);
 
   useEffect(() => {
-    localStorage.setItem('store_customer_payments', JSON.stringify(customerPayments));
+    localStorage.setItem('rehmat_store_customer_payments_v2', JSON.stringify(customerPayments));
   }, [customerPayments]);
 
   useEffect(() => {
-    localStorage.setItem('store_vendor_payments', JSON.stringify(vendorPayments));
+    localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(vendorPayments));
   }, [vendorPayments]);
 
   // Fetch initial data from Supabase if available
@@ -1100,12 +1100,22 @@ const initialMachineModels = [
   };
 
   const resetAllDataToZero = () => {
-    localStorage.removeItem('store_inventory_items');
-    localStorage.removeItem('store_usage_logs');
-    localStorage.removeItem('store_vendors');
-    localStorage.removeItem('store_machine_sales');
-    localStorage.removeItem('store_customer_payments');
-    localStorage.removeItem('store_vendor_payments');
+    const keysToRemove = [
+      'store_inventory_items',
+      'store_usage_logs',
+      'store_vendors',
+      'store_machine_sales',
+      'store_customer_payments',
+      'store_vendor_payments',
+      'rehmat_store_items_v2',
+      'rehmat_store_usage_logs_v2',
+      'rehmat_store_vendors_v2',
+      'rehmat_store_machine_sales_v2',
+      'rehmat_store_customer_payments_v2',
+      'rehmat_store_vendor_payments_v2'
+    ];
+
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
 
     setItems([]);
     setUsageLogs([]);
