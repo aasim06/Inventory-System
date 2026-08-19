@@ -25,16 +25,16 @@ export default function Default(colors) {
 
   return {
     primary: {
-      lighter: blue[0],
-      100: blue[1],
-      200: blue[2],
-      light: blue[3],
-      400: blue[4],
-      main: blue[5],
-      dark: blue[6],
-      700: blue[7],
-      darker: blue[8],
-      900: blue[9],
+      lighter: green[0],
+      100: green[1],
+      200: green[2],
+      light: green[3],
+      400: green[4],
+      main: green[5],
+      dark: green[6],
+      700: green[7],
+      darker: green[8],
+      900: green[9],
       contrastText
     },
     secondary: {

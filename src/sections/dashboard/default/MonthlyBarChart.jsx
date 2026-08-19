@@ -9,16 +9,36 @@ const xLabels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
 export default function MonthlyBarChart() {
   const theme = useTheme();
-  const { dailyUsageCount } = useStoreInventory();
+  const { usageLogs = [] } = useStoreInventory();
 
-  // Dynamic daily usage distribution
-  const data = [45, 62, 58, 42, 70, 35, dailyUsageCount || 28];
+  // Real dynamic usage calculation per weekday (Mon=0 .. Sun=6)
+  const weekData = [0, 0, 0, 0, 0, 0, 0];
+  const now = new Date();
+  const currentDayIndex = (now.getDay() + 6) % 7; // Mon: 0, Tue: 1 ... Sun: 6
+
+  const stockOutLogs = usageLogs.filter((log) => log.type && log.type.includes('OUT'));
+
+  stockOutLogs.forEach((log) => {
+    let dayIdx = currentDayIndex;
+    if (log.time && log.time.includes('Today')) {
+      dayIdx = currentDayIndex;
+    } else if (log.time && log.time.includes('Yesterday')) {
+      dayIdx = (currentDayIndex + 6) % 7;
+    } else if (log.dateISO) {
+      const logDate = new Date(log.dateISO);
+      if (!isNaN(logDate.getTime())) {
+        dayIdx = (logDate.getDay() + 6) % 7;
+      }
+    }
+    const qty = parseInt(log.qtyUsed) || 0;
+    weekData[dayIdx] += qty;
+  });
 
   return (
     <BarChart
       hideLegend
       height={380}
-      series={[{ data, label: 'Units Issued' }]}
+      series={[{ data: weekData, label: 'Units Issued' }]}
       xAxis={[{ data: xLabels, scaleType: 'band', tickSize: 7, disableLine: true, categoryGapRatio: 0.4 }]}
       yAxis={[{ position: 'none' }]}
       slotProps={{ bar: { rx: 5, ry: 5 } }}

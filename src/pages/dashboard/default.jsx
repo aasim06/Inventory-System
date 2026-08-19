@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
@@ -26,6 +27,12 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import Alert from '@mui/material/Alert';
+import TableContainer from '@mui/material/TableContainer';
+import Table from '@mui/material/Table';
+import TableHead from '@mui/material/TableHead';
+import TableBody from '@mui/material/TableBody';
+import TableRow from '@mui/material/TableRow';
+import TableCell from '@mui/material/TableCell';
 
 // project imports
 import MainCard from 'components/MainCard';
@@ -42,6 +49,14 @@ import WarningOutlined from '@ant-design/icons/WarningOutlined';
 import ToolOutlined from '@ant-design/icons/ToolOutlined';
 import ArrowRightOutlined from '@ant-design/icons/ArrowRightOutlined';
 import UserOutlined from '@ant-design/icons/UserOutlined';
+import DatabaseOutlined from '@ant-design/icons/DatabaseOutlined';
+import InboxOutlined from '@ant-design/icons/InboxOutlined';
+import RiseOutlined from '@ant-design/icons/RiseOutlined';
+import FireOutlined from '@ant-design/icons/FireOutlined';
+import FileTextOutlined from '@ant-design/icons/FileTextOutlined';
+import CheckCircleOutlined from '@ant-design/icons/CheckCircleOutlined';
+import ClockCircleOutlined from '@ant-design/icons/ClockCircleOutlined';
+import CloseCircleOutlined from '@ant-design/icons/CloseCircleOutlined';
 
 const avatarSX = {
   width: 36,
@@ -61,9 +76,11 @@ const actionSX = {
 // ==============================|| FACTORY STORE INVENTORY DASHBOARD ||============================== //
 
 export default function DashboardDefault() {
+  const navigate = useNavigate();
   const {
     items,
     usageLogs,
+    machineSales = [],
     totalInventoryCount,
     totalValuation,
     dailyUsageCount,
@@ -74,6 +91,10 @@ export default function DashboardDefault() {
     receiveStock,
     addNewItem
   } = useStoreInventory();
+
+  const totalMachineRevenue = machineSales.reduce((acc, m) => acc + (parseFloat(m.lineTotal) || 0), 0);
+  const totalMachinePaid = machineSales.reduce((acc, m) => acc + (parseFloat(m.paidAmount) || 0), 0);
+  const totalMachineBalance = machineSales.reduce((acc, m) => acc + (parseFloat(m.balanceAmount) || 0), 0);
 
   // Issue Dialog State
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
@@ -142,49 +163,75 @@ export default function DashboardDefault() {
           <Typography variant="h4" fontWeight={700}>
             Factory Store Inventory & Daily Usage Dashboard
           </Typography>
-
         </Box>
       </Grid>
 
       {/* Low Stock Warning Alert Banner */}
-      {lowStockAlerts.length > 0 && (
+      {lowStockAlerts && lowStockAlerts.length > 0 && (
         <Grid size={12}>
-          <Alert severity="warning" icon={<WarningOutlined style={{ fontSize: 20 }} />}>
-            <strong>ATTENTION REQUIRED:</strong> {lowStockAlerts.length} store item(s) are below minimum reorder threshold! Reorder soon to maintain production speed.
+          <Alert
+            severity="warning"
+            sx={{ border: '1px solid #fde047', bgcolor: '#fefce8', fontWeight: 700 }}
+            action={
+              <Button color="inherit" size="small" component={Link} to="/inventory/items" sx={{ fontWeight: 800 }}>
+                View {lowStockAlerts.length} Low Stock Items →
+              </Button>
+            }
+          >
+            ⚠️ Low Stock Warning: {lowStockAlerts.length} raw material spare parts are below minimum threshold! Reorder soon to prevent machine production delays.
           </Alert>
         </Grid>
       )}
 
-      {/* Row 1: Top Metric Cards (Exact requested titles & metrics) */}
-      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+
+      {/* Row 1: Top Metric Cards (5 Cards Layout) */}
+      <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
         <AnalyticEcommerce
           title="Total Items"
           count={items.length.toString()}
-          extra="items tracked"
+          extra="Total Active SKUs"
+          accentColor="#f97316"
+          bgGradient="radial-gradient(circle at 10% 20%, rgba(249, 115, 22, 0.18) 0%, #16171e 75%)"
         />
       </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+      <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
         <AnalyticEcommerce
           title="Total Stock"
           count={totalInventoryCount.toString()}
-          extra="units on hand"
+          extra="Total Store Units"
+          accentColor="#3b82f6"
+          bgGradient="radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.18) 0%, #16171e 75%)"
         />
       </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+      <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
         <AnalyticEcommerce
           title="Today's Stock In"
           count={`+${todayStockInQty || 0}`}
           color="success"
-          extra="units received"
+          extra="Received Today"
+          accentColor="#10b981"
+          bgGradient="radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.18) 0%, #16171e 75%)"
         />
       </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+      <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
         <AnalyticEcommerce
           title="Today's Stock Out"
           count={`−${todayStockOutQty || 0}`}
           isLoss={todayStockOutQty > 0}
           color={todayStockOutQty > 0 ? 'warning' : 'primary'}
-          extra="units used"
+          extra="Issued Today"
+          accentColor="#a855f7"
+          bgGradient="radial-gradient(circle at 10% 20%, rgba(168, 85, 247, 0.18) 0%, #16171e 75%)"
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
+        <AnalyticEcommerce
+          title="Machine Sales Revenue"
+          count={`Rs. ${totalMachineRevenue.toLocaleString()}`}
+          color="success"
+          extra={`${machineSales.length} Total Invoices`}
+          accentColor="#52c41a"
+          bgGradient="radial-gradient(circle at 10% 20%, rgba(82, 196, 26, 0.18) 0%, #16171e 75%)"
         />
       </Grid>
 
@@ -211,7 +258,7 @@ export default function DashboardDefault() {
         </MainCard>
       </Grid>
 
-      {/* Row 3: Main Table: Today's Usage & Who Used Each Item (Exact Mantis OrdersTable component) */}
+      {/* Row 3: Main Table: Today's Usage & Who Used Each Item */}
       <Grid size={{ xs: 12, md: 7, lg: 8 }}>
         <Grid container sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
           <Grid>
@@ -272,6 +319,133 @@ export default function DashboardDefault() {
               </ListItem>
             ))}
           </List>
+        </MainCard>
+      </Grid>
+
+      {/* Row 4: Customer Machine Sales & Billing Summary Section */}
+      <Grid size={{ xs: 12 }}>
+        <Grid container sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Grid>
+            <Typography variant="h5" fontWeight={700}>
+              📑 Customer Machine Sales & Billing Summary
+            </Typography>
+          </Grid>
+          <Grid>
+            <Button
+              variant="contained"
+              sx={{ bgcolor: '#52c41a', '&:hover': { bgcolor: '#389e0d' }, fontWeight: 700 }}
+              startIcon={<FileTextOutlined />}
+              onClick={() => navigate('/inventory/machine-sales')}
+            >
+              Open Machine Bill Book →
+            </Button>
+          </Grid>
+        </Grid>
+
+        <MainCard content={false}>
+          {/* Summary Metric Stats Bar */}
+          <Box sx={{ p: 2.5, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#f9fafb'), borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <Typography variant="caption" color="textSecondary" display="block">TOTAL MACHINE SALES REVENUE:</Typography>
+                <Typography variant="h4" fontWeight={800} color="success.main">
+                  Rs. {totalMachineRevenue.toLocaleString()}
+                </Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <Typography variant="caption" color="textSecondary" display="block">TOTAL CASH COLLECTED:</Typography>
+                <Typography variant="h4" fontWeight={800} color="#10b981">
+                  Rs. {totalMachinePaid.toLocaleString()}
+                </Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <Typography variant="caption" color="textSecondary" display="block">PENDING RECEIVABLES (BALANCES):</Typography>
+                <Typography variant="h4" fontWeight={800} color={totalMachineBalance > 0 ? 'error.main' : 'text.secondary'}>
+                  Rs. {totalMachineBalance.toLocaleString()}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Box>
+
+          {/* Recent Customer Machine Invoices Table */}
+          <TableContainer>
+            <Table size="small">
+              <TableHead sx={{ bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#fafafa') }}>
+                <TableRow>
+                  <TableCell>INVOICE NO</TableCell>
+                  <TableCell>CUSTOMER NAME</TableCell>
+                  <TableCell>MACHINE MODEL</TableCell>
+                  <TableCell align="center">QTY</TableCell>
+                  <TableCell align="right">TOTAL BILL</TableCell>
+                  <TableCell align="right">PAID</TableCell>
+                  <TableCell align="right">BALANCE</TableCell>
+                  <TableCell align="center">STATUS</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {machineSales.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                      <Typography variant="body2" color="textSecondary">
+                        No customer machine sales recorded yet.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  machineSales.slice(0, 4).map((sale) => (
+                    <TableRow key={sale.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate('/inventory/machine-sales')}>
+                      <TableCell>
+                        <Typography variant="subtitle2" fontWeight={700} color="primary.main">
+                          {sale.id}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="subtitle2" fontWeight={700}>
+                          {sale.customerName}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary" display="block">
+                          {sale.customerPhone}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={600}>
+                          {sale.machineName}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Typography variant="subtitle2">{sale.qty}</Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="subtitle2" fontWeight={700}>
+                          Rs. {(sale.lineTotal || 0).toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" color="success.main">
+                          Rs. {(sale.paidAmount || 0).toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" color={sale.balanceAmount > 0 ? 'error.main' : 'text.secondary'} fontWeight={700}>
+                          Rs. {(sale.balanceAmount || 0).toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          icon={
+                            sale.paymentStatus === 'Paid' ? <CheckCircleOutlined /> : sale.paymentStatus === 'Partial' ? <ClockCircleOutlined /> : <CloseCircleOutlined />
+                          }
+                          label={sale.paymentStatus || 'Paid'}
+                          color={sale.paymentStatus === 'Paid' ? 'success' : sale.paymentStatus === 'Partial' ? 'warning' : 'error'}
+                          size="small"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </MainCard>
       </Grid>
 
@@ -445,7 +619,7 @@ export default function DashboardDefault() {
               <Grid container spacing={2}>
                 <Grid size={6}>
                   <TextField
-                    label="Unit Cost ($)"
+                    label="Unit Cost"
                     type="number"
                     fullWidth
                     value={newItem.unitPrice}

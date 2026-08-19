@@ -88,10 +88,10 @@ export function buildPalette(presetColor) {
       disabled: 'rgba(161, 161, 170, 0.3)',
       disabledBackground: 'rgba(255, 255, 255, 0.05)'
     },
-    divider: 'rgba(255, 255, 255, 0.1)',
+    divider: 'rgba(255, 255, 255, 0.08)',
     background: {
-      paper: '#121215',
-      default: '#09090b'
+      paper: '#16171e',
+      default: '#0e0f14'
     },
     grey: {
       0: '#fafafa',

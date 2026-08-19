@@ -43,7 +43,7 @@ import MainCard from 'components/MainCard';
 const UNIT_OPTIONS = ['PCS', 'KG', 'Liter', 'Meter', 'Set'];
 
 export default function ItemsPage() {
-  const { items, masterItemNames = [], categories = [], issueStock, receiveStock, addNewItem, updateItem, deleteItem, deleteMultipleItems } = useStoreInventory();
+  const { items, masterItemNames = [], categories = [], issueStock, receiveStock, addNewItem, updateItem, deleteItem, deleteMultipleItems, cleanDuplicateItems } = useStoreInventory();
 
   // Search & Category filter
   const [searchTerm, setSearchTerm] = useState('');
@@ -228,6 +228,9 @@ export default function ItemsPage() {
               Delete Selected ({selected.length})
             </Button>
           )}
+          <Button variant="outlined" color="warning" onClick={cleanDuplicateItems}>
+            Clean Duplicates
+          </Button>
           <Button variant="contained" startIcon={<PlusOutlined />} onClick={() => setAddDrawerOpen(true)}>
             Add New Item
           </Button>
@@ -288,14 +291,13 @@ export default function ItemsPage() {
                   inputProps={{ 'aria-label': 'select all items' }}
                 />
               </TableCell>
-              <TableCell>Item Code / SKU</TableCell>
               <TableCell>Item Name</TableCell>
+              <TableCell>SKU Code</TableCell>
+              <TableCell align="right">Price Per Unit</TableCell>
               <TableCell>Category</TableCell>
-              <TableCell align="center">Total Stock</TableCell>
-              <TableCell align="center">Used Today</TableCell>
-              <TableCell align="center">Remaining Available Stock</TableCell>
-              <TableCell align="right">Unit Price</TableCell>
-              <TableCell>Location</TableCell>
+              <TableCell align="center">Units</TableCell>
+              <TableCell align="center">Stock Quantity</TableCell>
+              <TableCell align="center">Min Threshold</TableCell>
               <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -315,14 +317,20 @@ export default function ItemsPage() {
                   </TableCell>
 
                   <TableCell>
-                    <Typography variant="subtitle2" fontWeight={600}>
-                      {item.itemCode}
+                    <Typography variant="subtitle1" fontWeight={700} color="primary.main">
+                      {item.name}
                     </Typography>
                   </TableCell>
 
                   <TableCell>
                     <Typography variant="subtitle2" fontWeight={600}>
-                      {item.name}
+                      {item.itemCode}
+                    </Typography>
+                  </TableCell>
+
+                  <TableCell align="right">
+                    <Typography variant="subtitle2" fontWeight={600}>
+                      {item.unitPrice}
                     </Typography>
                   </TableCell>
 
@@ -331,50 +339,37 @@ export default function ItemsPage() {
                   </TableCell>
 
                   <TableCell align="center">
-                    {item.totalStock} {item.unit}
+                    <Chip label={item.unit} size="small" sx={{ bgcolor: 'grey.100' }} />
                   </TableCell>
 
                   <TableCell align="center">
-                    <Typography variant="subtitle2" color="error.main" fontWeight={700}>
-                      {item.usedToday} {item.unit}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell align="center">
-                    <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
+                    <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
                       <Typography variant="subtitle1" fontWeight={700} color={isLow ? 'error.main' : 'success.main'}>
-                        {item.remainingStock} {item.unit}
+                        {item.remainingStock}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        / {item.totalStock} {item.unit}
+                      </Typography>
+                    </Stack>
+                  </TableCell>
+
+                  <TableCell align="center">
+                    <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
+                      <Typography variant="subtitle2" fontWeight={600} color={isLow ? 'warning.main' : 'textSecondary'}>
+                        {item.minLevel} {item.unit}
                       </Typography>
                       {isLow && (
-                        <Tooltip title={`Low Stock! Minimum level is ${item.minLevel} ${item.unit}`}>
+                        <Tooltip title={`Low Stock Alert! Current stock (${item.remainingStock}) is below minimum threshold (${item.minLevel})`}>
                           <Chip icon={<WarningOutlined />} label="Low" size="small" color="warning" />
                         </Tooltip>
                       )}
                     </Stack>
                   </TableCell>
 
-                  <TableCell align="right">${item.unitPrice}</TableCell>
-
-                  <TableCell>
-                    <Chip label={item.rackLocation || 'Store'} size="small" sx={{ bgcolor: 'grey.100' }} />
-                  </TableCell>
-
                   <TableCell align="center">
                     <Stack direction="row" spacing={1} justifyContent="center">
-                      <Tooltip title="Stock Out (Usage)">
-                        <IconButton color="primary" size="small" onClick={() => handleOpenStockOut(item)}>
-                          <ExportOutlined />
-                        </IconButton>
-                      </Tooltip>
-
-                      <Tooltip title="Stock In (Shipment Received)">
-                        <IconButton color="success" size="small" onClick={() => handleOpenStockIn(item)}>
-                          <ImportOutlined />
-                        </IconButton>
-                      </Tooltip>
-
                       <Tooltip title="Edit Item">
-                        <IconButton color="info" size="small" onClick={() => handleOpenEdit(item)}>
+                        <IconButton color="primary" size="small" onClick={() => handleOpenEdit(item)}>
                           <EditOutlined />
                         </IconButton>
                       </Tooltip>
@@ -522,7 +517,7 @@ export default function ItemsPage() {
 
               {/* 3. Price Per Unit */}
               <TextField
-                label="Price Per Unit ($ / Rs)"
+                label="Price Per Unit"
                 type="number"
                 fullWidth
                 required
@@ -632,7 +627,7 @@ export default function ItemsPage() {
 
                 {/* 3. Price Per Unit */}
                 <TextField
-                  label="Price Per Unit ($ / Rs)"
+                  label="Price Per Unit"
                   type="number"
                   fullWidth
                   required

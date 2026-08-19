@@ -11,14 +11,18 @@ export default function DrawerHeader({ open }) {
     <DrawerHeaderStyled
       open={open}
       sx={{
-        minHeight: '60px',
-        width: 'initial',
+        minHeight: open ? '115px' : '65px',
+        width: '100%',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
         paddingTop: '8px',
         paddingBottom: '8px',
-        paddingLeft: open ? '24px' : 0
+        paddingLeft: 0,
+        paddingRight: 0
       }}
     >
-      <Logo isIcon={!open} sx={{ width: open ? 'auto' : 35, height: 35 }} />
+      <Logo isIcon={!open} sx={{ width: open ? '100%' : 44, height: open ? 'auto' : 44, display: 'flex', justifyContent: 'center' }} />
     </DrawerHeaderStyled>
   );
 }

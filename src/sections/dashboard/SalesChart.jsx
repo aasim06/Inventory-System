@@ -42,7 +42,7 @@ export default function SalesChart({ filter = 'today' }) {
     }
   };
 
-  const valueFormatter = (value) => `$ ${value} Thousands`;
+  const valueFormatter = (value) => `${value} Thousands`;
   const primaryColor = theme.vars.palette.primary.main;
   const primaryLightColor = theme.vars.palette.primary.lighter;
   const warningColor = theme.vars.palette.warning.main;
@@ -103,7 +103,7 @@ export default function SalesChart({ filter = 'today' }) {
             <Typography gutterBottom sx={{ color: 'text.secondary', fontSize: 14 }}>
               Net Profit
             </Typography>
-            <Typography variant="h4">$1560</Typography>
+            <Typography variant="h4">1560</Typography>
           </Box>
 
           <Stack direction="row" sx={{ gap: 3 }}>

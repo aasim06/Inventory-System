@@ -16,6 +16,7 @@ import {
   Grid,
   IconButton,
   InputAdornment,
+  MenuItem,
   OutlinedInput,
   Stack,
   Table,
@@ -35,20 +36,20 @@ import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, PhoneOutlin
 // project imports
 import MainCard from 'components/MainCard';
 
+const PARTY_TYPE_OPTIONS = ['Supplier (Vendor)', 'Customer (Party)', 'Contractor', 'Transporter', 'Other'];
+
 export default function VendorsPage() {
   const { vendors, addVendor, updateVendor, deleteVendor, deleteMultipleVendors } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selected, setSelected] = useState([]);
 
-  // Add Vendor Drawer State
+  // Add Vendor / Party Drawer State
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
   const [newVendor, setNewVendor] = useState({
     name: '',
-    contactPerson: '',
+    partyType: 'Supplier (Vendor)',
     phone: '',
-    email: '',
-    category: 'General Supplies',
     address: ''
   });
 
@@ -64,10 +65,12 @@ export default function VendorsPage() {
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
   const filteredVendors = vendors.filter((v) => {
+    const pType = v.partyType || 'Supplier (Vendor)';
     return (
       v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.category.toLowerCase().includes(searchTerm.toLowerCase())
+      pType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (v.phone && v.phone.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (v.address && v.address.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   });
 
@@ -107,10 +110,8 @@ export default function VendorsPage() {
     addVendor(newVendor);
     setNewVendor({
       name: '',
-      contactPerson: '',
+      partyType: 'Supplier (Vendor)',
       phone: '',
-      email: '',
-      category: 'General Supplies',
       address: ''
     });
     setAddDrawerOpen(false);
@@ -118,7 +119,10 @@ export default function VendorsPage() {
 
   // Handle Open Edit Drawer
   const handleOpenEdit = (vendor) => {
-    setEditingVendor({ ...vendor });
+    setEditingVendor({
+      ...vendor,
+      partyType: vendor.partyType || 'Supplier (Vendor)'
+    });
     setEditDrawerOpen(true);
   };
 
@@ -158,7 +162,7 @@ export default function VendorsPage() {
 
   return (
     <MainCard
-      title="Store Vendors & Suppliers Directory"
+      title="Vendors & Parties Directory"
       secondary={
         <Stack direction="row" spacing={1.5}>
           {selected.length > 0 && (
@@ -172,7 +176,7 @@ export default function VendorsPage() {
             </Button>
           )}
           <Button variant="contained" startIcon={<PlusOutlined />} onClick={() => setAddDrawerOpen(true)}>
-            + Add New Vendor
+            + Add New Vendor / Party
           </Button>
         </Stack>
       }
@@ -182,7 +186,7 @@ export default function VendorsPage() {
         <Grid item xs={12} sm={6}>
           <OutlinedInput
             fullWidth
-            placeholder="Search vendor name, contact person, supplied category..."
+            placeholder="Search vendor name, party type, phone number..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             startAdornment={
@@ -196,15 +200,15 @@ export default function VendorsPage() {
         <Grid item xs={12} sm={6} sx={{ textAlign: 'right' }}>
           <Typography variant="caption" color="textSecondary">
             {selected.length > 0 ? (
-              <strong style={{ color: '#ff4d4f' }}>{selected.length} vendors selected for deletion</strong>
+              <strong style={{ color: '#ff4d4f' }}>{selected.length} items selected for deletion</strong>
             ) : (
-              `Total ${filteredVendors.length} Registered Vendors`
+              `Total ${filteredVendors.length} Registered Vendors & Parties`
             )}
           </Typography>
         </Grid>
       </Grid>
 
-      {/* Vendors Table */}
+      {/* Vendors & Parties Table */}
       <TableContainer>
         <Table sx={{ minWidth: 700 }}>
           <TableHead>
@@ -218,28 +222,26 @@ export default function VendorsPage() {
                   inputProps={{ 'aria-label': 'select all vendors' }}
                 />
               </TableCell>
-              <TableCell>Vendor ID</TableCell>
-              <TableCell>Vendor / Company Name</TableCell>
-              <TableCell>Contact Person</TableCell>
+              <TableCell>Vendor / Person Name</TableCell>
+              <TableCell>Party Type</TableCell>
               <TableCell>Phone Number</TableCell>
-              <TableCell>Email Address</TableCell>
-              <TableCell>Supplied Category</TableCell>
-              <TableCell>Address / City</TableCell>
+              <TableCell>Company / Address Note</TableCell>
               <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filteredVendors.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="textSecondary">
-                    No registered vendors found.
+                    No registered vendors or parties found.
                   </Typography>
                 </TableCell>
               </TableRow>
             ) : (
               filteredVendors.map((vendor) => {
                 const isVendorSelected = isSelected(vendor.id);
+                const partyTypeLabel = vendor.partyType || vendor.category || 'Supplier (Vendor)';
 
                 return (
                   <TableRow key={vendor.id} hover selected={isVendorSelected}>
@@ -252,54 +254,37 @@ export default function VendorsPage() {
                     </TableCell>
 
                     <TableCell>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        {vendor.id}
-                      </Typography>
-                    </TableCell>
-
-                    <TableCell>
-                      <Typography variant="subtitle2" fontWeight={700}>
+                      <Typography variant="subtitle1" fontWeight={700} color="primary.main">
                         {vendor.name}
                       </Typography>
                     </TableCell>
 
                     <TableCell>
-                      <Typography variant="body2">{vendor.contactPerson}</Typography>
+                      <Chip label={partyTypeLabel} size="small" color="primary" variant="light" />
                     </TableCell>
 
                     <TableCell>
                       <Stack direction="row" spacing={1} alignItems="center">
-                        <PhoneOutlined style={{ fontSize: 13, color: '#1677ff' }} />
-                        <Typography variant="body2">{vendor.phone}</Typography>
+                        <PhoneOutlined style={{ fontSize: 13, color: '#52c41a' }} />
+                        <Typography variant="body2">{vendor.phone || 'N/A'}</Typography>
                       </Stack>
                     </TableCell>
 
                     <TableCell>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <MailOutlined style={{ fontSize: 13, color: '#fa8c16' }} />
-                        <Typography variant="caption">{vendor.email}</Typography>
-                      </Stack>
-                    </TableCell>
-
-                    <TableCell>
-                      <Chip label={vendor.category} size="small" color="primary" variant="light" />
-                    </TableCell>
-
-                    <TableCell>
-                      <Typography variant="caption" color="textSecondary">
-                        {vendor.address}
+                      <Typography variant="body2" color="textSecondary">
+                        {vendor.address || 'N/A'}
                       </Typography>
                     </TableCell>
 
                     <TableCell align="center">
                       <Stack direction="row" spacing={1} justifyContent="center">
-                        <Tooltip title="Edit Vendor">
+                        <Tooltip title="Edit Vendor / Party">
                           <IconButton color="primary" size="small" onClick={() => handleOpenEdit(vendor)}>
                             <EditOutlined />
                           </IconButton>
                         </Tooltip>
 
-                        <Tooltip title="Delete Vendor">
+                        <Tooltip title="Delete Vendor / Party">
                           <IconButton color="error" size="small" onClick={() => handleOpenDelete(vendor)}>
                             <DeleteOutlined />
                           </IconButton>
@@ -314,59 +299,60 @@ export default function VendorsPage() {
         </Table>
       </TableContainer>
 
-      {/* Drawer 1: Add New Vendor */}
+      {/* Drawer 1: Add New Vendor / Party */}
       <Drawer anchor="right" open={addDrawerOpen} onClose={() => setAddDrawerOpen(false)}>
-        <Box sx={{ width: 420, p: 3 }}>
-          <Typography variant="h4" sx={{ mb: 3 }}>
-            Add New Vendor / Supplier
+        <Box sx={{ width: 440, p: 3 }}>
+          <Typography variant="h4" sx={{ mb: 2.5, fontWeight: 700 }}>
+            Add New Vendor / Party
           </Typography>
 
           <form onSubmit={handleAddSubmit}>
             <Stack spacing={2.5}>
+              {/* 1. Vendor / Person Name */}
               <TextField
-                label="Vendor / Company Name"
+                label="VENDOR / PERSON NAME *"
                 fullWidth
                 required
+                placeholder="e.g. Amjad / Saqlain"
                 value={newVendor.name}
                 onChange={(e) => setNewVendor({ ...newVendor, name: e.target.value })}
               />
 
-              <TextField
-                label="Contact Person Name"
-                fullWidth
-                required
-                value={newVendor.contactPerson}
-                onChange={(e) => setNewVendor({ ...newVendor, contactPerson: e.target.value })}
-              />
+              {/* 2. Party Type & Phone Number in a row */}
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <TextField
+                    select
+                    label="PARTY TYPE *"
+                    fullWidth
+                    required
+                    value={newVendor.partyType}
+                    onChange={(e) => setNewVendor({ ...newVendor, partyType: e.target.value })}
+                  >
+                    {PARTY_TYPE_OPTIONS.map((option) => (
+                      <MenuItem key={option} value={option}>
+                        {option}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
 
-              <TextField
-                label="Phone Number"
-                fullWidth
-                required
-                value={newVendor.phone}
-                onChange={(e) => setNewVendor({ ...newVendor, phone: e.target.value })}
-              />
+                <Grid item xs={6}>
+                  <TextField
+                    label="PHONE NUMBER"
+                    fullWidth
+                    placeholder="e.g. 0300-1234567"
+                    value={newVendor.phone}
+                    onChange={(e) => setNewVendor({ ...newVendor, phone: e.target.value })}
+                  />
+                </Grid>
+              </Grid>
 
+              {/* 3. Company / Address Note */}
               <TextField
-                label="Email Address"
-                type="email"
+                label="COMPANY / ADDRESS NOTE"
                 fullWidth
-                value={newVendor.email}
-                onChange={(e) => setNewVendor({ ...newVendor, email: e.target.value })}
-              />
-
-              <TextField
-                label="Supplied Material Category"
-                fullWidth
-                value={newVendor.category}
-                onChange={(e) => setNewVendor({ ...newVendor, category: e.target.value })}
-              />
-
-              <TextField
-                label="Office / Factory Address"
-                fullWidth
-                multiline
-                rows={2}
+                placeholder="e.g. Amjad Tech Traders, Lahore"
                 value={newVendor.address}
                 onChange={(e) => setNewVendor({ ...newVendor, address: e.target.value })}
               />
@@ -375,7 +361,14 @@ export default function VendorsPage() {
                 <Button variant="outlined" color="secondary" onClick={() => setAddDrawerOpen(false)}>
                   Cancel
                 </Button>
-                <Button variant="contained" type="submit">
+                <Button
+                  variant="contained"
+                  type="submit"
+                  sx={{
+                    bgcolor: '#e67e22',
+                    '&:hover': { bgcolor: '#d35400' }
+                  }}
+                >
                   Save Vendor
                 </Button>
               </Stack>
@@ -384,68 +377,56 @@ export default function VendorsPage() {
         </Box>
       </Drawer>
 
-      {/* Drawer 2: Edit Vendor */}
+      {/* Drawer 2: Edit Vendor / Party */}
       <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
-        <Box sx={{ width: 420, p: 3 }}>
-          <Typography variant="h4" sx={{ mb: 3 }}>
-            Edit Vendor Details
+        <Box sx={{ width: 440, p: 3 }}>
+          <Typography variant="h4" sx={{ mb: 2.5, fontWeight: 700 }}>
+            Edit Vendor / Party
           </Typography>
 
           {editingVendor && (
             <form onSubmit={handleEditSubmit}>
               <Stack spacing={2.5}>
                 <TextField
-                  label="Vendor ID"
-                  fullWidth
-                  disabled
-                  value={editingVendor.id}
-                />
-
-                <TextField
-                  label="Vendor / Company Name"
+                  label="VENDOR / PERSON NAME *"
                   fullWidth
                   required
                   value={editingVendor.name}
                   onChange={(e) => setEditingVendor({ ...editingVendor, name: e.target.value })}
                 />
 
-                <TextField
-                  label="Contact Person Name"
-                  fullWidth
-                  required
-                  value={editingVendor.contactPerson}
-                  onChange={(e) => setEditingVendor({ ...editingVendor, contactPerson: e.target.value })}
-                />
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <TextField
+                      select
+                      label="PARTY TYPE *"
+                      fullWidth
+                      required
+                      value={editingVendor.partyType || 'Supplier (Vendor)'}
+                      onChange={(e) => setEditingVendor({ ...editingVendor, partyType: e.target.value })}
+                    >
+                      {PARTY_TYPE_OPTIONS.map((option) => (
+                        <MenuItem key={option} value={option}>
+                          {option}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item xs={6}>
+                    <TextField
+                      label="PHONE NUMBER"
+                      fullWidth
+                      value={editingVendor.phone || ''}
+                      onChange={(e) => setEditingVendor({ ...editingVendor, phone: e.target.value })}
+                    />
+                  </Grid>
+                </Grid>
 
                 <TextField
-                  label="Phone Number"
+                  label="COMPANY / ADDRESS NOTE"
                   fullWidth
-                  required
-                  value={editingVendor.phone}
-                  onChange={(e) => setEditingVendor({ ...editingVendor, phone: e.target.value })}
-                />
-
-                <TextField
-                  label="Email Address"
-                  type="email"
-                  fullWidth
-                  value={editingVendor.email}
-                  onChange={(e) => setEditingVendor({ ...editingVendor, email: e.target.value })}
-                />
-
-                <TextField
-                  label="Supplied Material Category"
-                  fullWidth
-                  value={editingVendor.category}
-                  onChange={(e) => setEditingVendor({ ...editingVendor, category: e.target.value })}
-                />
-
-                <TextField
-                  label="Office / Factory Address"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={editingVendor.address}
+                  value={editingVendor.address || ''}
                   onChange={(e) => setEditingVendor({ ...editingVendor, address: e.target.value })}
                 />
 
@@ -453,8 +434,15 @@ export default function VendorsPage() {
                   <Button variant="outlined" color="secondary" onClick={() => setEditDrawerOpen(false)}>
                     Cancel
                   </Button>
-                  <Button variant="contained" color="primary" type="submit">
-                    Update Vendor Changes
+                  <Button
+                    variant="contained"
+                    type="submit"
+                    sx={{
+                      bgcolor: '#e67e22',
+                      '&:hover': { bgcolor: '#d35400' }
+                    }}
+                  >
+                    Save Changes
                   </Button>
                 </Stack>
               </Stack>

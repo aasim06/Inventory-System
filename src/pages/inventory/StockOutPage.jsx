@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useStoreInventory } from 'context/StoreInventoryContext';
 
 // material-ui
 import {
+  Autocomplete,
   Box,
   Button,
   Checkbox,
@@ -10,15 +11,15 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
+  Divider,
   Drawer,
-  FormControl,
   Grid,
+  IconButton,
   InputAdornment,
-  InputLabel,
   MenuItem,
   OutlinedInput,
-  Select,
   Stack,
   Table,
   TableBody,
@@ -27,42 +28,70 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography
 } from '@mui/material';
 
 // icons
-import { ExportOutlined, SearchOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import { ExportOutlined, SearchOutlined, ArrowDownOutlined, DeleteOutlined, EditOutlined, PlusOutlined, PrinterOutlined } from '@ant-design/icons';
 
 // project imports
 import MainCard from 'components/MainCard';
 
 export default function StockOutPage() {
-  const { items, usageLogs, issueStock } = useStoreInventory();
+  const { items = [], vendors = [], masterItemNames = [], usageLogs = [], issueStock, deleteLog, updateLog, deleteMultipleLogs } = useStoreInventory();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selected, setSelected] = useState([]);
+  const itemSelectRef = useRef(null);
+  const qtyRef = useRef(null);
 
-  // Stock Out Modal State
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedItemId, setSelectedItemId] = useState(items[0]?.id || '');
-  const [qtyUsed, setQtyUsed] = useState(5);
-  const [usedBy, setUsedBy] = useState('Zubair Ahmed');
-  const [department, setDepartment] = useState('Assembly Line 1');
-  const [notes, setNotes] = useState('Daily production issue');
+  // Available customer/parties list from vendors context or fallback list
+  const partyList = vendors.length > 0
+    ? vendors.map((v) => v.name)
+    : ['Mobashar Ameer', 'Mohammad Asim Ameer', 'Zubair Ahmed', 'Amjad Tech Traders', 'General Customer'];
 
-  // Filter logs for OUT transactions only
+  // Add Stock Out Drawer Form State
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [form, setForm] = useState({
+    customer: '',
+    itemName: '',
+    qty: 1,
+    unitPrice: 0
+  });
+
+  // Edit Drawer Form State
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+  const [editingLog, setEditingLog] = useState(null);
+
+  // Delete Dialog State
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [logToDelete, setLogToDelete] = useState(null);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+
+  // Print Invoice Modal State
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [printData, setPrintData] = useState(null);
+
+  // Filter logs for OUT transactions
   const stockOutLogs = usageLogs.filter(
     (log) =>
-      log.type.includes('OUT') &&
+      log.type && log.type.includes('OUT') &&
       (log.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.usedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.department.toLowerCase().includes(searchTerm.toLowerCase()))
+        (log.usedBy && log.usedBy.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (log.department && log.department.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
-  const selectedItemObj = items.find((i) => i.id === selectedItemId);
+  // Combine all items list from store items and master item names for complete dropdown options
+  const existingNamesList = Array.from(
+    new Set([
+      ...items.map((i) => i.name),
+      ...(masterItemNames || []).map((m) => m.name)
+    ])
+  ).filter(Boolean);
 
-  // Checkbox Handlers
+  // Checkbox Selection Handlers
   const handleSelectAllClick = (event) => {
     if (event.target.checked) {
       const newSelected = stockOutLogs.map((n) => n.id);
@@ -91,229 +120,806 @@ export default function StockOutPage() {
 
   const isSelected = (id) => selected.indexOf(id) !== -1;
 
-  const handleSubmit = () => {
-    if (!selectedItemId || !usedBy) {
-      alert('Please select an item and enter operator name (Who Used).');
-      return;
-    }
-    const success = issueStock(selectedItemId, qtyUsed, usedBy, department, 'Store Keeper', notes);
-    if (success) {
-      setModalOpen(false);
+  // Auto-fill unit price when selecting item name
+  const handleItemNameChange = (event, newInputValue) => {
+    const val = typeof newInputValue === 'string' ? newInputValue : (newInputValue?.name || '');
+    const matchedItem = items.find((i) => i.name.toLowerCase() === val.toLowerCase());
+    if (matchedItem) {
+      setForm((prev) => ({
+        ...prev,
+        itemName: val,
+        unitPrice: matchedItem.unitPrice || 0
+      }));
     } else {
-      alert('Cannot issue stock. Stock insufficient!');
+      setForm((prev) => ({
+        ...prev,
+        itemName: val,
+        unitPrice: 0
+      }));
     }
   };
 
-  return (
-    <MainCard
-      title="Stock Out (Daily Usage Logs & Issuance)"
-      secondary={
-        <Button variant="contained" color="primary" startIcon={<ExportOutlined />} onClick={() => setModalOpen(true)}>
-          + Record Stock Out (Usage)
-        </Button>
+  // Quick Add Item to Table below (triggered when pressing Enter on QTY field)
+  const handleQuickAddToList = () => {
+    if (!form.itemName.trim()) return;
+
+    const targetItem = items.find((i) => i.name.toLowerCase() === form.itemName.toLowerCase());
+
+    if (!targetItem) {
+      alert('Selected item is not in store inventory!');
+      return;
+    }
+
+    const qtyVal = parseInt(form.qty) || 1;
+    const priceVal = parseFloat(form.unitPrice) > 0 ? parseFloat(form.unitPrice) : (targetItem.unitPrice || 0);
+
+    const success = issueStock(
+      targetItem.id,
+      qtyVal,
+      form.customer,
+      'Sales / Issuance',
+      'Store Keeper',
+      `Unit Price: ${priceVal}`,
+      priceVal
+    );
+    if (success) {
+      setForm((prev) => ({
+        ...prev,
+        itemName: '',
+        qty: 1,
+        unitPrice: 0
+      }));
+
+      // Auto-focus back to ITEM SELECT for non-stop typing
+      setTimeout(() => {
+        if (itemSelectRef.current) {
+          itemSelectRef.current.focus();
+        }
+      }, 50);
+    } else {
+      alert('Cannot issue stock. Insufficient available quantity!');
+    }
+  };
+
+  // Mouse Click Handler on Red Save Button (Triggers Print Customer Invoice Modal)
+  const handleSaveButtonClick = () => {
+    const targetItem = items.find((i) => i.name.toLowerCase() === form.itemName.toLowerCase());
+    const qtyVal = parseInt(form.qty) || 1;
+    const priceVal = parseFloat(form.unitPrice) > 0 ? parseFloat(form.unitPrice) : (targetItem?.unitPrice || 0);
+    const lineTotalVal = qtyVal * priceVal;
+
+    if (form.itemName.trim()) {
+      handleQuickAddToList();
+    }
+
+    setPrintData({
+      id: `INV-${Math.floor(10000 + Math.random() * 90000)}`,
+      type: 'Stock Out (Sales Invoice)',
+      customer: form.customer,
+      itemName: form.itemName,
+      qty: qtyVal,
+      unitPrice: priceVal,
+      lineTotal: lineTotalVal,
+      time: `Today, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    });
+
+    setPrintModalOpen(true);
+  };
+
+  // Submit Add Stock Out Handler
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.itemName.trim()) return;
+
+    const targetItem = items.find((i) => i.name.toLowerCase() === form.itemName.toLowerCase());
+
+    if (!targetItem) {
+      alert('Selected item is not in store inventory!');
+      return;
+    }
+
+    const qtyVal = parseInt(form.qty) || 1;
+    const priceVal = parseFloat(form.unitPrice) > 0 ? parseFloat(form.unitPrice) : (targetItem.unitPrice || 0);
+    const lineTotalVal = qtyVal * priceVal;
+    const invCode = `INV-${Math.floor(10000 + Math.random() * 90000)}`;
+
+    const success = issueStock(
+      targetItem.id,
+      qtyVal,
+      form.customer,
+      'Sales / Issuance',
+      'Store Keeper',
+      `Unit Price: ${priceVal}`,
+      priceVal
+    );
+    if (success) {
+      setDrawerOpen(false);
+
+      // Set Invoice Receipt Data for Modal
+      setPrintData({
+        id: invCode,
+        type: 'Stock Out (Sales Invoice)',
+        customer: form.customer,
+        itemName: form.itemName,
+        qty: qtyVal,
+        unitPrice: priceVal,
+        lineTotal: lineTotalVal,
+        time: `Today, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+      });
+
+      setForm({
+        customer: '',
+        itemName: '',
+        qty: 1,
+        unitPrice: 0
+      });
+
+      setPrintModalOpen(true);
+    } else {
+      alert('Cannot issue stock. Insufficient available quantity!');
+    }
+  };
+
+  // Open Print Modal for Row Log
+  const handleOpenPrint = (log) => {
+    const matchedItem = items.find((i) => i.name.toLowerCase() === (log.itemName || '').toLowerCase());
+    const unitPriceVal = (log.unitPrice && log.unitPrice > 0) ? log.unitPrice : (matchedItem?.unitPrice || 0);
+    const lineTotalVal = (log.lineTotal && log.lineTotal > 0) ? log.lineTotal : (log.qtyUsed * unitPriceVal);
+
+    setPrintData({
+      id: log.itemCode || `INV-${log.id}`,
+      type: 'Sales Invoice Receipt',
+      customer: log.usedBy || log.department || 'Customer',
+      itemName: log.itemName,
+      qty: log.qtyUsed,
+      unitPrice: unitPriceVal,
+      lineTotal: lineTotalVal,
+      time: log.time
+    });
+    setPrintModalOpen(true);
+  };
+
+  // Close Print Modal & Focus Item Select Input
+  const handleClosePrintModal = () => {
+    setPrintModalOpen(false);
+    setTimeout(() => {
+      if (itemSelectRef.current) {
+        itemSelectRef.current.focus();
       }
-    >
-      {/* Search Bar */}
-      <Grid container spacing={2} sx={{ mb: 3, alignItems: 'center' }}>
-        <Grid item xs={12} sm={6}>
-          <OutlinedInput
-            fullWidth
-            placeholder="Search Stock Out logs by Item Name, Worker Name (Who Used), Dept..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            startAdornment={
-              <InputAdornment position="start">
-                <SearchOutlined />
-              </InputAdornment>
-            }
-          />
-        </Grid>
+    }, 50);
+  };
 
-        <Grid item xs={12} sm={6} sx={{ textAlign: 'right' }}>
-          <Typography variant="caption" color="textSecondary">
-            {selected.length > 0 ? (
-              <strong style={{ color: '#1677ff' }}>{selected.length} selected</strong>
-            ) : (
-              `Total ${stockOutLogs.length} Stock Out Records`
-            )}
-          </Typography>
-        </Grid>
-      </Grid>
+  // Trigger System Print Window
+  const handlePrint = () => {
+    window.print();
+  };
 
-      {/* Stock Out Table */}
-      <TableContainer>
-        <Table sx={{ minWidth: 750 }}>
-          <TableHead>
-            <TableRow>
-              <TableCell padding="checkbox">
-                <Checkbox
-                  color="primary"
-                  indeterminate={selected.length > 0 && selected.length < stockOutLogs.length}
-                  checked={stockOutLogs.length > 0 && selected.length === stockOutLogs.length}
-                  onChange={handleSelectAllClick}
-                  inputProps={{ 'aria-label': 'select all stock out' }}
-                />
-              </TableCell>
-              <TableCell>Log ID / Time</TableCell>
-              <TableCell>Item Code / SKU</TableCell>
-              <TableCell>Item Name</TableCell>
-              <TableCell align="center">Qty Used / Issued</TableCell>
-              <TableCell>Who Used Each Item (Operator Name)</TableCell>
-              <TableCell>Department / Line</TableCell>
-              <TableCell align="right">Remaining Stock After</TableCell>
-              <TableCell>Issued By</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {stockOutLogs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    No Stock Out usage records found.
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              stockOutLogs.map((log) => {
-                const isItemSelected = isSelected(log.id);
+  // Open Edit Drawer
+  const handleOpenEdit = (log) => {
+    setEditingLog({
+      ...log,
+      customer: log.usedBy || partyList[0],
+      qty: log.qtyUsed || 1,
+      unitPrice: log.unitPrice || 0
+    });
+    setEditDrawerOpen(true);
+  };
 
-                return (
-                  <TableRow key={log.id} hover selected={isItemSelected}>
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        color="primary"
-                        checked={isItemSelected}
-                        onChange={(e) => handleSelectOne(e, log.id)}
-                      />
-                    </TableCell>
+  // Submit Edit Handler
+  const handleEditSubmit = (e) => {
+    e.preventDefault();
+    if (!editingLog) return;
 
-                    <TableCell>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        {log.id}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        {log.time}
-                      </Typography>
-                    </TableCell>
+    const qtyVal = parseInt(editingLog.qty) || 1;
+    const priceVal = parseFloat(editingLog.unitPrice) || 0;
 
-                    <TableCell>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        {log.itemCode}
-                      </Typography>
-                    </TableCell>
+    updateLog(editingLog.id, {
+      itemName: editingLog.itemName,
+      usedBy: editingLog.customer,
+      qtyUsed: qtyVal,
+      unitPrice: priceVal,
+      lineTotal: qtyVal * priceVal
+    });
+    setEditDrawerOpen(false);
+  };
 
-                    <TableCell>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        {log.itemName}
-                      </Typography>
-                    </TableCell>
+  // Single Delete Handlers
+  const handleOpenDelete = (log) => {
+    setLogToDelete(log);
+    setDeleteDialogOpen(true);
+  };
 
-                    <TableCell align="center">
-                      <Typography variant="subtitle1" fontWeight={700} color="error.main" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                        <ArrowDownOutlined /> -{log.qtyUsed}
-                      </Typography>
-                    </TableCell>
+  const handleConfirmDelete = () => {
+    if (logToDelete) {
+      deleteLog(logToDelete.id);
+      setSelected((prev) => prev.filter((id) => id !== logToDelete.id));
+      setDeleteDialogOpen(false);
+      setLogToDelete(null);
+    }
+  };
 
-                    <TableCell>
-                      <Chip label={log.usedBy} size="small" color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
-                    </TableCell>
+  // Bulk Delete Handler
+  const handleConfirmBulkDelete = () => {
+    if (selected.length > 0) {
+      deleteMultipleLogs(selected);
+      setSelected([]);
+      setBulkDeleteDialogOpen(false);
+    }
+  };
 
-                    <TableCell>
-                      <Typography variant="body2">{log.department}</Typography>
-                    </TableCell>
+  const lineTotal = (parseInt(form.qty) || 0) * (parseFloat(form.unitPrice) || 0);
 
-                    <TableCell align="right">
-                      <Typography variant="subtitle2" fontWeight={700} color="primary.main">
-                        {log.remainingStockAfter} available
-                      </Typography>
-                    </TableCell>
-
-                    <TableCell>
-                      <Typography variant="caption" color="textSecondary">
-                        {log.issuedBy}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* Drawer: Add Stock Out / Issue Item */}
-      <Drawer anchor="right" open={modalOpen} onClose={() => setModalOpen(false)}>
-        <Box sx={{ width: 420, p: 3 }}>
-          <Typography variant="h4" sx={{ mb: 3 }}>
-            📤 Issue Item (Store OUT)
-          </Typography>
-
-          <Stack spacing={2.5}>
-            <FormControl fullWidth>
-              <InputLabel>Select Item to Issue</InputLabel>
-              <Select value={selectedItemId} label="Select Item to Issue" onChange={(e) => setSelectedItemId(e.target.value)}>
-                {items.map((i) => (
-                  <MenuItem key={i.id} value={i.id}>
-                    {i.name} ({i.remainingStock} {i.unit} in stock)
+  return (
+    <Stack spacing={3}>
+      {/* 1. TOP SECTION: Record Stock Out Form Card */}
+      <MainCard
+        title=" Record Stock Out (Sales / Usage Invoice)"
+        sx={{
+          boxShadow: (theme) => (theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 2px 10px rgba(0, 0, 0, 0.05)'),
+          borderRadius: 2
+        }}
+      >
+        <form onSubmit={(e) => { e.preventDefault(); handleQuickAddToList(); }}>
+          <Grid container spacing={2.5} alignItems="center">
+            {/* ROW 1 */}
+            {/* 1. SELECT CUSTOMER / RECEIVED BY */}
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <TextField
+                select
+                label="SELECT CUSTOMER / RECEIVED BY *"
+                fullWidth
+                required
+                value={form.customer}
+                onChange={(e) => setForm({ ...form, customer: e.target.value })}
+              >
+                <MenuItem value="" disabled>
+                  <em>Select Name</em>
+                </MenuItem>
+                {partyList.map((p) => (
+                  <MenuItem key={p} value={p}>
+                    {p}
                   </MenuItem>
                 ))}
-              </Select>
-            </FormControl>
+              </TextField>
+            </Grid>
 
-            {selectedItemObj && (
-              <Box sx={{ p: 1.5, bgcolor: 'grey.50', borderRadius: 1 }}>
-                <Typography variant="caption" color="textSecondary" display="block">
-                  Current Stock Level:
-                </Typography>
-                <Typography variant="h6" color="primary.main" fontWeight={700}>
-                  {selectedItemObj.remainingStock} {selectedItemObj.unit} Available
-                </Typography>
-              </Box>
-            )}
+            {/* 2. ITEM SELECT */}
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <Autocomplete
+                freeSolo
+                options={existingNamesList}
+                value={form.itemName}
+                onChange={(event, newValue) => handleItemNameChange(event, newValue)}
+                onInputChange={(event, newInputValue) => handleItemNameChange(event, newInputValue)}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: '41.38px',
+                    minHeight: '41.38px',
+                    py: 0
+                  }
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    inputRef={itemSelectRef}
+                    label="ITEM SELECT *"
+                    required
+                    placeholder="Select Item"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (qtyRef.current) {
+                          qtyRef.current.focus();
+                          qtyRef.current.select();
+                        }
+                      }
+                    }}
+                  />
+                )}
+              />
+            </Grid>
 
-            <TextField
-              label="Quantity Used / Issued"
-              type="number"
-              fullWidth
-              inputProps={{ min: 1, max: selectedItemObj?.remainingStock }}
-              value={qtyUsed}
-              onChange={(e) => setQtyUsed(Math.max(1, parseInt(e.target.value) || 1))}
-            />
+            {/* 3. QTY */}
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <TextField
+                label="QTY *"
+                type="number"
+                fullWidth
+                required
+                inputRef={qtyRef}
+                inputProps={{ min: 1 }}
+                value={form.qty}
+                onChange={(e) => setForm({ ...form, qty: parseInt(e.target.value) || 1 })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleQuickAddToList();
+                  }
+                }}
+              />
+            </Grid>
 
-            <TextField
-              label="Who Used (Operator / Worker Name)"
-              fullWidth
-              required
-              placeholder="e.g. Zubair Ahmed"
-              value={usedBy}
-              onChange={(e) => setUsedBy(e.target.value)}
-            />
+            {/* ROW 2 */}
+            {/* 4. UNIT PRICE */}
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <TextField
+                label="UNIT PRICE (PKR)"
+                type="number"
+                fullWidth
+                inputProps={{ min: 0 }}
+                value={form.unitPrice}
+                onChange={(e) => setForm({ ...form, unitPrice: parseFloat(e.target.value) || 0 })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleQuickAddToList();
+                  }
+                }}
+              />
+            </Grid>
 
-            <TextField
-              label="Department / Workstation"
-              fullWidth
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-            />
+            {/* 5. LINE TOTAL */}
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <TextField
+                label="LINE TOTAL (PKR)"
+                fullWidth
+                value={`Rs. ${lineTotal.toLocaleString()}`}
+                InputProps={{
+                  readOnly: true,
+                  style: { fontWeight: 800, color: '#ff4d4f', fontSize: '1.05rem' }
+                }}
+                sx={{
+                  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255, 77, 79, 0.12)' : '#fff1f2'),
+                  borderRadius: 1
+                }}
+              />
+            </Grid>
 
-            <TextField
-              label="Usage Notes / Work Order #"
-              fullWidth
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-
-            <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
-              <Button variant="outlined" color="secondary" onClick={() => setModalOpen(false)}>
-                Cancel
+            {/* 6. SAVE BUTTON */}
+            <Grid size={{ xs: 12, sm: 12, md: 4 }}>
+              <Button
+                variant="contained"
+                type="button"
+                onClick={handleSaveButtonClick}
+                fullWidth
+                startIcon={<ExportOutlined />}
+                sx={{
+                  height: '41.38px',
+                  bgcolor: '#ff4d4f',
+                  '&:hover': { bgcolor: '#d9363e' },
+                  fontSize: '0.9rem',
+                  fontWeight: 700,
+                  boxShadow: '0 4px 14px rgba(255, 77, 79, 0.3)'
+                }}
+              >
+                Confirm Sales Invoice & Save
               </Button>
-              <Button variant="contained" color="primary" onClick={handleSubmit}>
-                Record Stock Out
-              </Button>
-            </Stack>
-          </Stack>
+            </Grid>
+          </Grid>
+        </form>
+      </MainCard>
+
+      {/* 2. BOTTOM SECTION: Stock Out Logs Table Card */}
+      <MainCard
+        title="Stock Out (Sales / Usage Logs)"
+        secondary={
+          selected.length > 0 && (
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<DeleteOutlined />}
+              onClick={() => setBulkDeleteDialogOpen(true)}
+            >
+              Delete Selected ({selected.length})
+            </Button>
+          )
+        }
+      >
+        {/* Search Bar Controls */}
+        <Grid container spacing={2} sx={{ mb: 3, alignItems: 'center' }}>
+          <Grid item xs={12} sm={6}>
+            <OutlinedInput
+              fullWidth
+              placeholder="Search Stock Out logs by Item Name, Customer / Buyer..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              startAdornment={
+                <InputAdornment position="start">
+                  <SearchOutlined />
+                </InputAdornment>
+              }
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6} sx={{ textAlign: 'right' }}>
+            <Typography variant="caption" color="textSecondary">
+              {selected.length > 0 ? (
+                <strong style={{ color: '#ff4d4f' }}>{selected.length} records selected for deletion</strong>
+              ) : (
+                `Total ${stockOutLogs.length} Stock Out Records`
+              )}
+            </Typography>
+          </Grid>
+        </Grid>
+
+        {/* Stock Out Table */}
+        <TableContainer>
+          <Table sx={{ minWidth: 700 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    color="primary"
+                    indeterminate={selected.length > 0 && selected.length < stockOutLogs.length}
+                    checked={stockOutLogs.length > 0 && selected.length === stockOutLogs.length}
+                    onChange={handleSelectAllClick}
+                    inputProps={{ 'aria-label': 'select all stock out' }}
+                  />
+                </TableCell>
+                <TableCell>ITEM SELECT</TableCell>
+                <TableCell align="center">QTY</TableCell>
+                <TableCell align="center">UNIT PRICE</TableCell>
+                <TableCell align="right">LINE TOTAL</TableCell>
+                <TableCell align="right">DATE & TIME</TableCell>
+                <TableCell align="center">ACTIONS</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {stockOutLogs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                    <Typography variant="body2" color="textSecondary">
+                      No Stock Out usage records found.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                stockOutLogs.map((log) => {
+                  const isItemSelected = isSelected(log.id);
+                  const matchedItem = items.find((i) => i.name.toLowerCase() === (log.itemName || '').toLowerCase());
+                  const unitPriceVal = (log.unitPrice && log.unitPrice > 0) ? log.unitPrice : (matchedItem?.unitPrice || 0);
+                  const lineTotalVal = (log.lineTotal && log.lineTotal > 0) ? log.lineTotal : (log.qtyUsed * unitPriceVal);
+
+                  return (
+                    <TableRow key={log.id} hover selected={isItemSelected}>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          color="primary"
+                          checked={isItemSelected}
+                          onChange={(e) => handleSelectOne(e, log.id)}
+                        />
+                      </TableCell>
+
+                      <TableCell>
+                        <Typography variant="subtitle2" fontWeight={600}>
+                          {log.itemName}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                          {log.itemCode}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell align="center">
+                        <Typography variant="subtitle1" fontWeight={700} color="error.main" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <ArrowDownOutlined /> -{log.qtyUsed}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell align="center">
+                        <Typography variant="body2">
+                          Rs. {unitPriceVal.toLocaleString()}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell align="right">
+                        <Typography variant="subtitle2" fontWeight={700}>
+                          Rs. {lineTotalVal.toLocaleString()}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell align="right">
+                        <Typography variant="caption" color="textSecondary">
+                          {log.time}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell align="center">
+                        <Stack direction="row" spacing={1} justifyContent="center">
+                          <Tooltip title="Print Invoice Receipt">
+                            <IconButton color="info" size="small" onClick={() => handleOpenPrint(log)}>
+                              <PrinterOutlined />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Edit Record">
+                            <IconButton color="primary" size="small" onClick={() => handleOpenEdit(log)}>
+                              <EditOutlined />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete Record">
+                            <IconButton color="error" size="small" onClick={() => handleOpenDelete(log)}>
+                              <DeleteOutlined />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </MainCard>
+
+      {/* Edit Drawer */}
+      <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
+        <Box sx={{ width: 440, p: 3 }}>
+          <Typography variant="h4" sx={{ mb: 3, fontWeight: 700 }}>
+            ✏️ Edit Stock Out Record
+          </Typography>
+
+          {editingLog && (
+            <form onSubmit={handleEditSubmit}>
+              <Stack spacing={2.5}>
+                <TextField
+                  select
+                  label="SELECT CUSTOMER / RECEIVED BY *"
+                  fullWidth
+                  required
+                  value={editingLog.customer}
+                  onChange={(e) => setEditingLog({ ...editingLog, customer: e.target.value })}
+                >
+                  {partyList.map((p) => (
+                    <MenuItem key={p} value={p}>
+                      {p}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  label="ITEM SELECT *"
+                  fullWidth
+                  required
+                  value={editingLog.itemName}
+                  onChange={(e) => setEditingLog({ ...editingLog, itemName: e.target.value })}
+                />
+
+                <TextField
+                  label="QTY *"
+                  type="number"
+                  fullWidth
+                  required
+                  inputProps={{ min: 1 }}
+                  value={editingLog.qty}
+                  onChange={(e) => setEditingLog({ ...editingLog, qty: parseInt(e.target.value) || 1 })}
+                />
+
+                <TextField
+                  label="UNIT PRICE"
+                  type="number"
+                  fullWidth
+                  inputProps={{ min: 0 }}
+                  value={editingLog.unitPrice}
+                  onChange={(e) => setEditingLog({ ...editingLog, unitPrice: parseFloat(e.target.value) || 0 })}
+                />
+
+                <TextField
+                  label="LINE TOTAL"
+                  fullWidth
+                  disabled
+                  value={`Rs. ${((parseInt(editingLog.qty) || 0) * (parseFloat(editingLog.unitPrice) || 0)).toLocaleString()}`}
+                />
+
+                <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
+                  <Button variant="outlined" color="secondary" onClick={() => setEditDrawerOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="contained" color="primary" type="submit">
+                    Update Record
+                  </Button>
+                </Stack>
+              </Stack>
+            </form>
+          )}
         </Box>
       </Drawer>
-    </MainCard>
+
+      {/* Delete Single Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Confirm Delete Stock Out Record</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete the Stock Out record for <strong>{logToDelete?.itemName}</strong>?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setDeleteDialogOpen(false)} color="secondary">
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmDelete} color="error" variant="contained">
+            Delete Record
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk Delete Dialog */}
+      <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Confirm Bulk Delete</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete <strong>{selected.length}</strong> selected Stock Out records?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setBulkDeleteDialogOpen(false)} color="secondary">
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmBulkDelete} color="error" variant="contained">
+            Delete {selected.length} Selected
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 📄 Print Invoice Receipt Modal Dialog */}
+      <Dialog open={printModalOpen} onClose={handleClosePrintModal} maxWidth="md" fullWidth>
+        <style>
+          {`
+            @media print {
+              @page {
+                size: auto;
+                margin: 8mm;
+              }
+              body * {
+                visibility: hidden !important;
+              }
+              #printable-invoice-stockout, #printable-invoice-stockout * {
+                visibility: visible !important;
+              }
+              #printable-invoice-stockout {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+              }
+              .MuiDialogActions-root,
+              .MuiDialogTitle-root,
+              .no-print,
+              button {
+                display: none !important;
+              }
+            }
+          `}
+        </style>
+
+        <DialogTitle className="no-print" sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+          <Typography variant="h5" fontWeight={700}>📄 Customer Sales Invoice & Statement</Typography>
+          <Chip label={printData?.type || 'Stock Out'} color="error" size="small" />
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 3 } }}>
+          {printData && (() => {
+            const activeCustomerLogs = stockOutLogs.filter(
+              (log) => (log.usedBy || log.department || '').toLowerCase() === (printData.customer || '').toLowerCase()
+            );
+
+            const displayLogs = activeCustomerLogs.length > 0 ? activeCustomerLogs : [
+              {
+                id: printData.id,
+                itemName: printData.itemName,
+                itemCode: printData.id,
+                qtyUsed: printData.qty,
+                unitPrice: printData.unitPrice,
+                lineTotal: printData.lineTotal
+              }
+            ];
+
+            const grandTotalSum = displayLogs.reduce((sum, item) => {
+              const total = item.lineTotal || (item.qtyUsed * (item.unitPrice || 0));
+              return sum + total;
+            }, 0);
+
+            return (
+              <Box id="printable-invoice-stockout" sx={{ p: 1, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
+                <Typography variant="h3" fontWeight={800} align="center" sx={{ color: '#ff4d4f', mb: 0.5, letterSpacing: '0.5px' }}>
+                  REHMAT LAWN MOWERS
+                </Typography>
+                <Typography variant="subtitle1" fontWeight={700} align="center" sx={{ color: '#ff4d4f', mb: 0.5 }}>
+                  FACTORY STORE INVENTORY & STOCK ISSUANCE
+                </Typography>
+                <Typography variant="caption" display="block" align="center" color="textSecondary" sx={{ mb: 2 }}>
+                  Official Sales & Stock Issuance Invoice Voucher
+                </Typography>
+
+                <Divider sx={{ my: 1.5 }} />
+
+                <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                  <Grid size={{ xs: 6 }}>
+                    <Typography variant="caption" color="textSecondary" display="block">INVOICE NO:</Typography>
+                    <Typography variant="subtitle2" fontWeight={700}>{printData.id}</Typography>
+                  </Grid>
+                  <Grid size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
+                    <Typography variant="caption" color="textSecondary" display="block">DATE & TIME:</Typography>
+                    <Typography variant="subtitle2" fontWeight={700}>{printData.time}</Typography>
+                  </Grid>
+                  <Grid size={{ xs: 12 }} sx={{ mt: 1 }}>
+                    <Typography variant="caption" color="textSecondary" display="block">CUSTOMER / RECEIVED BY:</Typography>
+                    <Typography variant="h5" fontWeight={800} color="primary.main">{printData.customer}</Typography>
+                  </Grid>
+                </Grid>
+
+                {/* Complete Multi-Item Table for Customer */}
+                <TableContainer sx={{ border: '1px solid #e5e7eb', borderRadius: 1, mb: 2 }}>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#f9fafb' }}>
+                      <TableRow>
+                        <TableCell><strong>#</strong></TableCell>
+                        <TableCell><strong>ITEM DESCRIPTION</strong></TableCell>
+                        <TableCell align="center"><strong>QTY</strong></TableCell>
+                        <TableCell align="right"><strong>UNIT PRICE</strong></TableCell>
+                        <TableCell align="right"><strong>TOTAL AMOUNT</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {displayLogs.map((item, idx) => {
+                        const itemUnitPrice = item.unitPrice || 0;
+                        const itemLineTotal = item.lineTotal || (item.qtyUsed * itemUnitPrice);
+                        return (
+                          <TableRow key={item.id || idx} hover>
+                            <TableCell>{idx + 1}</TableCell>
+                            <TableCell>
+                              <Typography variant="subtitle2" fontWeight={700}>{item.itemName}</Typography>
+                              {item.itemCode && (
+                                <Typography variant="caption" color="textSecondary" display="block">
+                                  {item.itemCode}
+                                </Typography>
+                              )}
+                            </TableCell>
+                            <TableCell align="center">
+                              <Typography variant="subtitle2" fontWeight={700} color="error.main">
+                                -{item.qtyUsed}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">Rs. {itemUnitPrice.toLocaleString()}</TableCell>
+                            <TableCell align="right">
+                              <Typography variant="subtitle2" fontWeight={700}>
+                                Rs. {itemLineTotal.toLocaleString()}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                <Box sx={{ bgcolor: '#fff1f2', p: 2, borderRadius: 1.5, textAlign: 'right', border: '1px solid #fecdd3' }}>
+                  <Typography variant="caption" color="textSecondary" display="block">TOTAL CUSTOMER INVOICE AMOUNT ({displayLogs.length} Items):</Typography>
+                  <Typography variant="h3" fontWeight={800} color="#e11d48">
+                    Rs. {grandTotalSum.toLocaleString()}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })()}
+        </DialogContent>
+
+        <DialogActions className="no-print" sx={{ p: 2.5, justifyContent: 'space-between' }}>
+          <Button variant="outlined" color="secondary" onClick={handleClosePrintModal} size="large" className="no-print">
+            Close & Continue
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<PrinterOutlined />}
+            onClick={handlePrint}
+            size="large"
+            className="no-print"
+            sx={{ px: 3, fontWeight: 700 }}
+          >
+            Print Sales Invoice ({stockOutLogs.filter(log => (log.usedBy || log.department || '').toLowerCase() === (printData?.customer || '').toLowerCase()).length || 1} Items)
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Stack>
   );
 }

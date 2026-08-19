@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useEffect } from 'react';
-import { initialStoreItems, initialUsageLogs, initialVendors, initialCompanies, initialCities, initialCategories } from 'data/factoryStoreData';
+import { initialStoreItems, initialUsageLogs, initialVendors, initialCategories, initialMachineSales } from 'data/factoryStoreData';
 import { supabase } from 'api/supabase';
 
 const StoreInventoryContext = createContext();
@@ -17,10 +17,19 @@ const initialMasterItemNames = [
 ];
 
 export function StoreInventoryProvider({ children }) {
-  // 1. Inventory Items State
+  // 1. Inventory Items State (Auto-clean ghost duplicates created during earlier test)
   const [items, setItems] = useState(() => {
     const saved = localStorage.getItem('store_inventory_items');
-    return saved ? JSON.parse(saved) : initialStoreItems;
+    const parsed = saved ? JSON.parse(saved) : initialStoreItems;
+    const seen = new Set();
+    return parsed.filter((item) => {
+      if (item.totalStock === 0 && item.unitPrice === 0 && item.remainingStock === 0) {
+        const key = `${(item.name || '').toLowerCase()}_zero`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+      }
+      return true;
+    });
   });
 
   // 2. Usage & Issue Logs State
@@ -35,19 +44,7 @@ export function StoreInventoryProvider({ children }) {
     return saved ? JSON.parse(saved) : initialVendors;
   });
 
-  // 4. Companies State
-  const [companies, setCompanies] = useState(() => {
-    const saved = localStorage.getItem('store_companies');
-    return saved ? JSON.parse(saved) : initialCompanies;
-  });
-
-  // 5. Cities State
-  const [cities, setCities] = useState(() => {
-    const saved = localStorage.getItem('store_cities');
-    return saved ? JSON.parse(saved) : initialCities;
-  });
-
-  // 6. Categories State
+  // 4. Categories State
   const [categories, setCategories] = useState(() => {
     const saved = localStorage.getItem('store_categories');
     return saved ? JSON.parse(saved) : initialCategories;
@@ -59,10 +56,83 @@ export function StoreInventoryProvider({ children }) {
     return saved ? JSON.parse(saved) : initialMasterItemNames;
   });
 
+const initialMachineModels = [
+  'Rehmat 20" Lawn Mower (Petrol Engine)',
+  'Rehmat Electric Lawn Cutter 18"',
+  'Rehmat Heavy Duty Lawn Mower 24"',
+  'Rehmat Grass Trimmer & Cutter 2-Stroke',
+  'Rehmat Hand Push Lawn Roller Mower'
+];
+
+  // 8. Customer Machine Sales State
+  const [machineSales, setMachineSales] = useState(() => {
+    const saved = localStorage.getItem('store_machine_sales');
+    const parsed = saved ? JSON.parse(saved) : null;
+    if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    return initialMachineSales;
+  });
+
+  // 9. Master Machine Models Catalog State
+  const [machineModels, setMachineModels] = useState(() => {
+    const saved = localStorage.getItem('store_machine_models');
+    return saved ? JSON.parse(saved) : initialMachineModels;
+  });
+
+  // 10. Machine BOM Recipes State
+  const [machineRecipes, setMachineRecipes] = useState(() => {
+    const saved = localStorage.getItem('store_machine_recipes');
+    const parsed = saved ? JSON.parse(saved) : null;
+    if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+      // Filter out test entries like 'Emmami' if user wants real lawn mower recipe
+      const clean = parsed.filter(r => !(r.modelName || '').toLowerCase().includes('emmami'));
+      if (clean.length > 0) return clean;
+    }
+    return [
+      {
+        id: 'BOM-1',
+        modelName: 'Rehmat 20" Lawn Mower (Petrol Engine)',
+        description: 'Standard 20-Inch Heavy Duty Petrol Engine Lawn Mower Assembly Formula',
+        ingredients: [
+          { itemName: '3HP Electric Motor (3-Phase)', qty: 1, unit: 'pcs' },
+          { itemName: 'SKF Ball Bearing 6205-2RS', qty: 2, unit: 'pcs' },
+          { itemName: 'M8x50mm Stainless Steel Bolts', qty: 1, unit: 'boxes' }
+        ]
+      },
+      {
+        id: 'BOM-2',
+        modelName: 'Rehmat Electric Lawn Cutter 18"',
+        description: 'Compact 18-Inch Electric Cutter Assembly Formula',
+        ingredients: [
+          { itemName: '3HP Electric Motor (3-Phase)', qty: 1, unit: 'pcs' },
+          { itemName: 'SKF Ball Bearing 6205-2RS', qty: 4, unit: 'pcs' },
+          { itemName: 'M8x50mm Stainless Steel Bolts', qty: 2, unit: 'boxes' }
+        ]
+      }
+    ];
+  });
+
+  // 11. Customer Payments & Ledger Entries State
+  const [customerPayments, setCustomerPayments] = useState(() => {
+    const saved = localStorage.getItem('store_customer_payments');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // 12. Vendor Payments & Ledger Entries State
+  const [vendorPayments, setVendorPayments] = useState(() => {
+    const saved = localStorage.getItem('store_vendor_payments');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   // Sync state to LocalStorage as secondary backup
   useEffect(() => {
     localStorage.setItem('store_inventory_items', JSON.stringify(items));
   }, [items]);
+
+  useEffect(() => {
+    localStorage.setItem('store_machine_sales', JSON.stringify(machineSales));
+  }, [machineSales]);
 
   useEffect(() => {
     localStorage.setItem('store_usage_logs', JSON.stringify(usageLogs));
@@ -73,20 +143,24 @@ export function StoreInventoryProvider({ children }) {
   }, [vendors]);
 
   useEffect(() => {
-    localStorage.setItem('store_companies', JSON.stringify(companies));
-  }, [companies]);
-
-  useEffect(() => {
-    localStorage.setItem('store_cities', JSON.stringify(cities));
-  }, [cities]);
-
-  useEffect(() => {
     localStorage.setItem('store_categories', JSON.stringify(categories));
   }, [categories]);
 
   useEffect(() => {
     localStorage.setItem('store_master_item_names', JSON.stringify(masterItemNames));
   }, [masterItemNames]);
+
+  useEffect(() => {
+    localStorage.setItem('store_machine_recipes', JSON.stringify(machineRecipes));
+  }, [machineRecipes]);
+
+  useEffect(() => {
+    localStorage.setItem('store_customer_payments', JSON.stringify(customerPayments));
+  }, [customerPayments]);
+
+  useEffect(() => {
+    localStorage.setItem('store_vendor_payments', JSON.stringify(vendorPayments));
+  }, [vendorPayments]);
 
   // Fetch initial data from Supabase if available
   useEffect(() => {
@@ -95,21 +169,40 @@ export function StoreInventoryProvider({ children }) {
         // Fetch Store Items
         const { data: dbItems, error: itemsErr } = await supabase.from('store_items').select('*');
         if (!itemsErr && dbItems && dbItems.length > 0) {
-          const mappedItems = dbItems.map((i) => ({
-            id: i.id,
-            itemCode: i.item_code,
-            name: i.name,
-            category: i.category,
-            totalStock: i.total_stock,
-            usedToday: i.used_today,
-            remainingStock: i.remaining_stock,
-            unit: i.unit,
-            unitPrice: i.unit_price,
-            minLevel: i.min_level,
-            rackLocation: i.rack_location,
-            status: i.status
-          }));
+          const seen = new Set();
+          const mappedItems = dbItems
+            .map((i) => ({
+              id: i.id,
+              itemCode: i.item_code,
+              name: i.name,
+              category: i.category,
+              totalStock: i.total_stock,
+              usedToday: i.used_today,
+              remainingStock: i.remaining_stock,
+              unit: i.unit,
+              unitPrice: i.unit_price,
+              minLevel: i.min_level,
+              rackLocation: i.rack_location,
+              status: i.status
+            }))
+            .filter((i) => {
+              if (i.totalStock === 0 && i.unitPrice === 0 && i.remainingStock === 0) {
+                const key = `${(i.name || '').toLowerCase()}_zero`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return false; // remove all zero-price zero-stock test entries
+              }
+              return true;
+            });
+
           setItems(mappedItems);
+
+          // Clean up ghost rows in Supabase database automatically
+          try {
+            await supabase.from('store_items').delete().eq('total_stock', 0).eq('unit_price', 0);
+          } catch (err) {
+            console.error(err);
+          }
         }
 
         // Fetch Vendors
@@ -128,28 +221,6 @@ export function StoreInventoryProvider({ children }) {
             rating: v.rating
           }));
           setVendors(mappedVendors);
-        }
-
-        // Fetch Companies
-        const { data: dbCompanies, error: cmpErr } = await supabase.from('companies').select('*');
-        if (!cmpErr && dbCompanies && dbCompanies.length > 0) {
-          const mappedCompanies = dbCompanies.map((c) => ({
-            id: c.id,
-            name: c.name,
-            description: c.description
-          }));
-          setCompanies(mappedCompanies);
-        }
-
-        // Fetch Cities
-        const { data: dbCities, error: ctyErr } = await supabase.from('cities').select('*');
-        if (!ctyErr && dbCities && dbCities.length > 0) {
-          const mappedCities = dbCities.map((c) => ({
-            id: c.id,
-            name: c.name,
-            description: c.description
-          }));
-          setCities(mappedCities);
         }
 
         // Fetch Categories
@@ -229,18 +300,6 @@ export function StoreInventoryProvider({ children }) {
 
     setMasterItemNames((prev) => [newMaster, ...prev]);
 
-    // Also auto-add to active Store Items
-    addNewItem({
-      name: newName,
-      itemCode: skuCode,
-      category: category,
-      unit: defaultUnit,
-      totalStock: initialStock,
-      minLevel: minThreshold,
-      unitPrice: unitPrice,
-      rackLocation: 'Main Store'
-    });
-
     try {
       await supabase.from('master_item_names').insert([{
         name: newName,
@@ -288,11 +347,36 @@ export function StoreInventoryProvider({ children }) {
   };
 
   // 1. Issue Stock / Daily Usage Action
-  const issueStock = async (itemId, qtyUsed, usedBy, department = 'Production Line', issuedBy = 'Store Keeper', notes = '') => {
-    const targetItem = items.find((i) => i.id === itemId || i.itemCode === itemId);
+  const issueStock = async (itemIdOrObj, qtyUsedParam, usedByParam, departmentParam = 'Production Line', issuedByParam = 'Store Keeper', notesParam = '', unitPriceParam = 0) => {
+    let itemId = itemIdOrObj;
+    let qtyUsed = qtyUsedParam;
+    let usedBy = usedByParam;
+    let department = departmentParam;
+    let issuedBy = issuedByParam;
+    let notes = notesParam;
+    let unitPrice = unitPriceParam;
+
+    if (typeof itemIdOrObj === 'object' && itemIdOrObj !== null) {
+      itemId = itemIdOrObj.itemId || itemIdOrObj.itemName || itemIdOrObj.itemCode;
+      qtyUsed = itemIdOrObj.qtyUsed;
+      usedBy = itemIdOrObj.usedBy;
+      department = itemIdOrObj.department || 'Production Line';
+      issuedBy = itemIdOrObj.issuedBy || 'Store Keeper';
+      notes = itemIdOrObj.notes || '';
+      unitPrice = itemIdOrObj.unitPrice || 0;
+    }
+
+    const targetItem = items.find(
+      (i) =>
+        i.id === itemId ||
+        i.itemCode === itemId ||
+        (i.name || '').toLowerCase() === (itemId || '').toLowerCase()
+    );
     if (!targetItem) return false;
 
     const actualQty = Math.abs(parseInt(qtyUsed) || 1);
+    const price = parseFloat(unitPrice) > 0 ? parseFloat(unitPrice) : (targetItem.unitPrice || 0);
+    const lineTotal = actualQty * price;
     const newRemainingStock = Math.max(0, targetItem.remainingStock - actualQty);
     const newUsedToday = targetItem.usedToday + actualQty;
     const isLowStock = newRemainingStock <= targetItem.minLevel;
@@ -319,6 +403,8 @@ export function StoreInventoryProvider({ children }) {
       itemCode: targetItem.itemCode,
       itemName: targetItem.name,
       qtyUsed: actualQty,
+      unitPrice: price,
+      lineTotal: lineTotal,
       usedBy,
       department,
       issuedBy,
@@ -360,11 +446,13 @@ export function StoreInventoryProvider({ children }) {
   };
 
   // 2. Receive Stock / Store IN Action
-  const receiveStock = async (itemId, qtyReceived, supplierName = 'Vendor Shipment', refNo = 'PO-' + Math.floor(1000 + Math.random() * 9000)) => {
-    const targetItem = items.find((i) => i.id === itemId || i.itemCode === itemId);
+  const receiveStock = async (itemId, qtyReceived, supplierName = 'Vendor Shipment', refNo = 'PO-' + Math.floor(1000 + Math.random() * 9000), unitPrice = 0) => {
+    const targetItem = items.find((i) => i.id === itemId || i.itemCode === itemId || i.name.toLowerCase() === (itemId || '').toLowerCase());
     if (!targetItem) return false;
 
     const actualQty = Math.abs(parseInt(qtyReceived) || 1);
+    const price = parseFloat(unitPrice) || targetItem.unitPrice || 0;
+    const lineTotal = actualQty * price;
     const newTotalStock = targetItem.totalStock + actualQty;
     const newRemainingStock = targetItem.remainingStock + actualQty;
     const isLowStock = newRemainingStock <= targetItem.minLevel;
@@ -376,6 +464,7 @@ export function StoreInventoryProvider({ children }) {
             ...item,
             totalStock: newTotalStock,
             remainingStock: newRemainingStock,
+            unitPrice: price > 0 ? price : item.unitPrice,
             status: isLowStock ? 0 : 1
           };
         }
@@ -389,6 +478,8 @@ export function StoreInventoryProvider({ children }) {
       itemCode: targetItem.itemCode,
       itemName: targetItem.name,
       qtyUsed: actualQty,
+      unitPrice: price,
+      lineTotal: lineTotal,
       usedBy: supplierName,
       department: 'Store Inward',
       issuedBy: 'Store Manager',
@@ -440,16 +531,6 @@ export function StoreInventoryProvider({ children }) {
       status: 1
     };
     setItems((prev) => [newItem, ...prev]);
-
-    // Auto-save to master item names if not present
-    const exists = masterItemNames.some((m) => m.name.toLowerCase() === newItemData.name.toLowerCase());
-    if (!exists && newItemData.name) {
-      addMasterItemName({
-        name: newItemData.name,
-        category: newItemData.category,
-        defaultUnit: newItemData.unit
-      });
-    }
 
     try {
       await supabase.from('store_items').insert([{
@@ -521,6 +602,28 @@ export function StoreInventoryProvider({ children }) {
 
     try {
       await supabase.from('store_items').delete().in('id', itemIds);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Clean Duplicate Test Items Action
+  const cleanDuplicateItems = async () => {
+    const seen = new Set();
+    const cleaned = items.filter((item) => {
+      if (item.totalStock === 0 && item.unitPrice === 0 && item.remainingStock === 0) {
+        const key = `${(item.name || '').toLowerCase()}_zero`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+      }
+      return true;
+    });
+
+    setItems(cleaned);
+    localStorage.setItem('store_inventory_items', JSON.stringify(cleaned));
+
+    try {
+      await supabase.from('store_items').delete().eq('total_stock', 0).eq('unit_price', 0);
     } catch (e) {
       console.error(e);
     }
@@ -603,117 +706,7 @@ export function StoreInventoryProvider({ children }) {
     }
   };
 
-  // 8. Company Actions
-  const addCompany = async (companyData) => {
-    const newCompany = {
-      id: `CMP-${Math.floor(100 + Math.random() * 900)}`,
-      name: companyData.name,
-      description: companyData.description || ''
-    };
-    setCompanies((prev) => [newCompany, ...prev]);
-
-    try {
-      await supabase.from('companies').insert([{
-        name: companyData.name,
-        description: companyData.description || ''
-      }]);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const updateCompany = async (companyId, updatedData) => {
-    setCompanies((prev) =>
-      prev.map((c) => (c.id === companyId ? { ...c, ...updatedData } : c))
-    );
-
-    try {
-      await supabase.from('companies').update({
-        name: updatedData.name,
-        description: updatedData.description || ''
-      }).eq('id', companyId);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const deleteCompany = async (companyId) => {
-    setCompanies((prev) => prev.filter((c) => c.id !== companyId));
-
-    try {
-      await supabase.from('companies').delete().eq('id', companyId);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const deleteMultipleCompanies = async (companyIds) => {
-    const idsSet = new Set(companyIds);
-    setCompanies((prev) => prev.filter((c) => !idsSet.has(c.id)));
-
-    try {
-      await supabase.from('companies').delete().in('id', companyIds);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  // 9. City Actions
-  const addCity = async (cityData) => {
-    const newCity = {
-      id: `CTY-${Math.floor(100 + Math.random() * 900)}`,
-      name: cityData.name,
-      description: cityData.description || ''
-    };
-    setCities((prev) => [newCity, ...prev]);
-
-    try {
-      await supabase.from('cities').insert([{
-        name: cityData.name,
-        description: cityData.description || ''
-      }]);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const updateCity = async (cityId, updatedData) => {
-    setCities((prev) =>
-      prev.map((c) => (c.id === cityId ? { ...c, ...updatedData } : c))
-    );
-
-    try {
-      await supabase.from('cities').update({
-        name: updatedData.name,
-        description: updatedData.description || ''
-      }).eq('id', cityId);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const deleteCity = async (cityId) => {
-    setCities((prev) => prev.filter((c) => c.id !== cityId));
-
-    try {
-      await supabase.from('cities').delete().eq('id', cityId);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const deleteMultipleCities = async (cityIds) => {
-    const idsSet = new Set(cityIds);
-    setCities((prev) => prev.filter((c) => !idsSet.has(c.id)));
-
-    try {
-      await supabase.from('cities').delete().in('id', cityIds);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  // 10. Category Actions
+  // 8. Category Actions
   const addCategory = async (categoryData) => {
     const newCategory = {
       id: `CAT-${Math.floor(100 + Math.random() * 900)}`,
@@ -768,6 +761,344 @@ export function StoreInventoryProvider({ children }) {
     }
   };
 
+  // Usage Logs Actions
+  const deleteLog = async (logId) => {
+    setUsageLogs((prev) => prev.filter((l) => l.id !== logId));
+    try {
+      await supabase.from('usage_logs').delete().eq('id', logId);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const updateLog = async (logId, updatedData) => {
+    setUsageLogs((prev) =>
+      prev.map((l) => (l.id === logId ? { ...l, ...updatedData } : l))
+    );
+    try {
+      await supabase.from('usage_logs').update({
+        item_name: updatedData.itemName,
+        used_by: updatedData.usedBy,
+        qty_used: updatedData.qtyUsed
+      }).eq('id', logId);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Machine Sales Actions
+  const addMachineSale = async (newSaleData) => {
+    const now = new Date();
+    const id = newSaleData.id || `MS-${Math.floor(10000 + Math.random() * 90000)}`;
+
+    const itemsList = (newSaleData.items && newSaleData.items.length > 0)
+      ? newSaleData.items.map((i) => {
+          const q = parseInt(i.qty) || 1;
+          const p = parseFloat(i.unitPrice) || 0;
+          const discPercent = parseFloat(i.discount) || 0;
+          const gross = q * p;
+          const discAmount = (gross * discPercent) / 100;
+          const lineTotal = Math.max(0, gross - discAmount);
+          return {
+            machineName: i.machineName || 'Machine',
+            serialNo: i.serialNo || '',
+            qty: q,
+            unitPrice: p,
+            discount: discPercent,
+            discountAmount: discAmount,
+            lineTotal
+          };
+        })
+      : [{
+          machineName: newSaleData.machineName || 'Machine',
+          serialNo: newSaleData.serialNo || '',
+          qty: parseInt(newSaleData.qty) || 1,
+          unitPrice: parseFloat(newSaleData.unitPrice) || 0,
+          discount: parseFloat(newSaleData.discount) || 0,
+          discountAmount: (((parseInt(newSaleData.qty) || 1) * (parseFloat(newSaleData.unitPrice) || 0)) * (parseFloat(newSaleData.discount) || 0)) / 100,
+          lineTotal: Math.max(0, ((parseInt(newSaleData.qty) || 1) * (parseFloat(newSaleData.unitPrice) || 0)) - ((((parseInt(newSaleData.qty) || 1) * (parseFloat(newSaleData.unitPrice) || 0)) * (parseFloat(newSaleData.discount) || 0)) / 100))
+        }];
+
+    const subTotalVal = itemsList.reduce((sum, i) => sum + i.lineTotal, 0);
+    const discountVal = parseFloat(newSaleData.discountAmount) || 0;
+    const netTotalVal = Math.max(0, subTotalVal - discountVal);
+    const totalQtySum = itemsList.reduce((sum, i) => sum + i.qty, 0);
+    const paidVal = parseFloat(newSaleData.paidAmount) || 0;
+    const balanceVal = Math.max(0, netTotalVal - paidVal);
+
+    // Auto-register machine names to Master Catalog if new
+    itemsList.forEach((i) => {
+      if (i.machineName && i.machineName.trim()) {
+        addMachineModel(i.machineName);
+      }
+    });
+
+    const dateFormatted = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeFormatted = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const fullDateString = `${dateFormatted}, ${timeFormatted}`;
+    const firstMachine = itemsList[0] || {};
+
+    const newEntry = {
+      id,
+      customerName: newSaleData.customerName || 'Customer',
+      customerPhone: newSaleData.customerPhone || '',
+      cityAddress: newSaleData.cityAddress || '',
+      items: itemsList,
+      machineName: itemsList.length > 1 ? `${firstMachine.machineName} (+${itemsList.length - 1} more)` : firstMachine.machineName,
+      serialNo: firstMachine.serialNo || '',
+      qty: totalQtySum,
+      unitPrice: firstMachine.unitPrice,
+      subTotal: subTotalVal,
+      discountAmount: discountVal,
+      lineTotal: netTotalVal,
+      paidAmount: paidVal,
+      balanceAmount: balanceVal,
+      paymentStatus: newSaleData.paymentStatus || (paidVal >= netTotalVal ? 'Paid' : paidVal > 0 ? 'Partial' : 'Unpaid'),
+      warrantyTerms: newSaleData.warrantyTerms || '1 Year Motor & Frame Free Service Warranty',
+      time: fullDateString,
+      dateISO: now.toISOString()
+    };
+
+    setMachineSales((prev) => [newEntry, ...prev]);
+
+    try {
+      await supabase.from('machine_sales').insert([{
+        id: newEntry.id,
+        customer_name: newEntry.customerName,
+        customer_phone: newEntry.customerPhone,
+        city_address: newEntry.cityAddress,
+        machine_name: newEntry.machineName,
+        serial_no: newEntry.serialNo,
+        qty: newEntry.qty,
+        unit_price: newEntry.unitPrice,
+        line_total: newEntry.lineTotal,
+        paid_amount: newEntry.paidAmount,
+        balance_amount: newEntry.balanceAmount,
+        payment_status: newEntry.paymentStatus,
+        warranty_terms: newEntry.warrantyTerms,
+        date_iso: newEntry.dateISO
+      }]);
+    } catch (e) {
+      console.error(e);
+    }
+    return newEntry;
+  };
+
+  const updateMachineSale = async (id, updatedData) => {
+    setMachineSales((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, ...updatedData } : m))
+    );
+    try {
+      await supabase.from('machine_sales').update({
+        customer_name: updatedData.customerName,
+        customer_phone: updatedData.customerPhone,
+        city_address: updatedData.cityAddress,
+        machine_name: updatedData.machineName,
+        serial_no: updatedData.serialNo,
+        qty: updatedData.qty,
+        unit_price: updatedData.unitPrice,
+        line_total: updatedData.lineTotal,
+        paid_amount: updatedData.paidAmount,
+        balance_amount: updatedData.balanceAmount,
+        payment_status: updatedData.paymentStatus,
+        warranty_terms: updatedData.warrantyTerms
+      }).eq('id', id);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const addMachineModel = (modelName) => {
+    if (!modelName || !modelName.trim()) return;
+    const trimmed = modelName.trim();
+    setMachineModels((prev) => {
+      if (prev.some((m) => m.toLowerCase() === trimmed.toLowerCase())) return prev;
+      const updated = [trimmed, ...prev];
+      localStorage.setItem('store_machine_models', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const deleteMachineSale = async (id) => {
+    setMachineSales((prev) => prev.filter((m) => m.id !== id));
+    try {
+      await supabase.from('machine_sales').delete().eq('id', id);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteMultipleMachineSales = async (ids) => {
+    const idsSet = new Set(ids);
+    setMachineSales((prev) => prev.filter((m) => !idsSet.has(m.id)));
+    try {
+      await supabase.from('machine_sales').delete().in('id', ids);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // ----------------------------------------------------
+  // BOM MACHINE RECIPES & PRODUCTION ASSEMBLY ACTIONS
+  // ----------------------------------------------------
+  const saveMachineRecipe = (recipeData) => {
+    const id = recipeData.id || `BOM-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newRecipe = {
+      ...recipeData,
+      id,
+      updatedAt: new Date().toISOString()
+    };
+
+    setMachineRecipes((prev) => {
+      const idx = prev.findIndex((r) => r.id === id || r.modelName.toLowerCase() === recipeData.modelName.toLowerCase());
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = newRecipe;
+        return updated;
+      }
+      return [newRecipe, ...prev];
+    });
+
+    // Auto add model to master catalog if new
+    if (recipeData.modelName) {
+      addMachineModel(recipeData.modelName);
+    }
+  };
+
+  const deleteMachineRecipe = (id) => {
+    setMachineRecipes((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  // Batch Assemble Machine (Deducts all raw materials based on Recipe)
+  const assembleMachine = (modelName, buildQty = 1) => {
+    const recipe = machineRecipes.find((r) => r.modelName.toLowerCase() === modelName.toLowerCase());
+    if (!recipe || !recipe.ingredients || recipe.ingredients.length === 0) {
+      return { success: false, message: `No BOM Recipe formula found for ${modelName}. Please define recipe first.` };
+    }
+
+    const deductedList = [];
+    recipe.ingredients.forEach((ing) => {
+      const requiredQty = (parseFloat(ing.qty) || 1) * buildQty;
+      // Deduct from store stock
+      issueStock({
+        itemName: ing.itemName,
+        qtyUsed: requiredQty,
+        usedBy: `Assembly: ${buildQty}x ${modelName}`,
+        department: 'Assembly Floor (BOM Production)',
+        unitPrice: 0
+      });
+      deductedList.push({ itemName: ing.itemName, qtyDeducted: requiredQty });
+    });
+
+    return { success: true, count: buildQty, deductedList };
+  };
+
+  // ----------------------------------------------------
+  // CUSTOMER LEDGER & PAYMENTS ACTIONS
+  // ----------------------------------------------------
+  const addCustomerPayment = (paymentData) => {
+    const paymentId = `PAY-${Math.floor(10000 + Math.random() * 90000)}`;
+    const now = new Date();
+    const formattedTime = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}, ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+
+    const newPayment = {
+      id: paymentId,
+      invoiceId: paymentData.invoiceId || '',
+      customerName: paymentData.customerName || 'Walk-in Customer',
+      amountPaid: parseFloat(paymentData.amountPaid) || 0,
+      paymentMethod: paymentData.paymentMethod || 'Cash',
+      referenceNo: paymentData.referenceNo || '',
+      notes: paymentData.notes || '',
+      time: formattedTime,
+      createdAt: now.toISOString()
+    };
+
+    setCustomerPayments((prev) => [newPayment, ...prev]);
+
+    // Auto-update machine sales invoice paid amount & status if matching invoiceId
+    if (paymentData.invoiceId) {
+      setMachineSales((prevSales) =>
+        prevSales.map((sale) => {
+          if (sale.id === paymentData.invoiceId) {
+            const updatedPaid = (sale.paidAmount || 0) + newPayment.amountPaid;
+            const netBill = sale.lineTotal || 0;
+            const updatedStatus = updatedPaid >= netBill ? 'Paid' : updatedPaid > 0 ? 'Partial' : 'Unpaid';
+            return {
+              ...sale,
+              paidAmount: updatedPaid,
+              paymentStatus: updatedStatus
+            };
+          }
+          return sale;
+        })
+      );
+    }
+  };
+
+  // ----------------------------------------------------
+  // VENDOR LEDGER & PAYABLE ACTIONS
+  // ----------------------------------------------------
+  const addVendorPayment = (paymentData) => {
+    const paymentId = `VPAY-${Math.floor(10000 + Math.random() * 90000)}`;
+    const now = new Date();
+    const formattedTime = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}, ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+
+    const newPayment = {
+      id: paymentId,
+      vendorName: paymentData.vendorName || 'Supplier',
+      amountPaid: parseFloat(paymentData.amountPaid) || 0,
+      paymentMethod: paymentData.paymentMethod || 'Cash',
+      referenceNo: paymentData.referenceNo || '',
+      notes: paymentData.notes || '',
+      time: formattedTime,
+      createdAt: now.toISOString()
+    };
+
+    setVendorPayments((prev) => [newPayment, ...prev]);
+  };
+
+  // ----------------------------------------------------
+  // FULL BACKUP EXPORT & IMPORT ACTIONS
+  // ----------------------------------------------------
+  const exportFullBackupData = () => {
+    const backupObj = {
+      version: '2.0.0',
+      exportedAt: new Date().toISOString(),
+      items,
+      usageLogs,
+      vendors,
+      categories,
+      masterItemNames,
+      machineSales,
+      machineModels,
+      machineRecipes,
+      customerPayments,
+      vendorPayments
+    };
+    return JSON.stringify(backupObj, null, 2);
+  };
+
+  const importFullBackupData = (jsonString) => {
+    try {
+      const data = JSON.parse(jsonString);
+      if (data.items && Array.isArray(data.items)) setItems(data.items);
+      if (data.usageLogs && Array.isArray(data.usageLogs)) setUsageLogs(data.usageLogs);
+      if (data.vendors && Array.isArray(data.vendors)) setVendors(data.vendors);
+      if (data.categories && Array.isArray(data.categories)) setCategories(data.categories);
+      if (data.masterItemNames && Array.isArray(data.masterItemNames)) setMasterItemNames(data.masterItemNames);
+      if (data.machineSales && Array.isArray(data.machineSales)) setMachineSales(data.machineSales);
+      if (data.machineModels && Array.isArray(data.machineModels)) setMachineModels(data.machineModels);
+      if (data.machineRecipes && Array.isArray(data.machineRecipes)) setMachineRecipes(data.machineRecipes);
+      if (data.customerPayments && Array.isArray(data.customerPayments)) setCustomerPayments(data.customerPayments);
+      if (data.vendorPayments && Array.isArray(data.vendorPayments)) setVendorPayments(data.vendorPayments);
+
+      return { success: true, message: 'All Store Data Successfully Restored!' };
+    } catch (err) {
+      console.error(err);
+      return { success: false, message: 'Invalid Backup JSON File format.' };
+    }
+  };
+
   // Computed Metrics
   const totalInventoryCount = items.reduce((acc, i) => acc + i.remainingStock, 0);
   const totalValuation = items.reduce((acc, i) => acc + i.remainingStock * i.unitPrice, 0);
@@ -784,10 +1115,21 @@ export function StoreInventoryProvider({ children }) {
         items,
         usageLogs,
         vendors,
-        companies,
-        cities,
         categories,
         masterItemNames,
+        machineSales,
+        machineModels,
+        machineRecipes,
+        customerPayments,
+        vendorPayments,
+        addMachineModel,
+        saveMachineRecipe,
+        deleteMachineRecipe,
+        assembleMachine,
+        addCustomerPayment,
+        addVendorPayment,
+        exportFullBackupData,
+        importFullBackupData,
         totalInventoryCount,
         totalValuation,
         dailyUsageCount: todayStockOutQty,
@@ -800,27 +1142,26 @@ export function StoreInventoryProvider({ children }) {
         updateItem,
         deleteItem,
         deleteMultipleItems,
+        cleanDuplicateItems,
         addVendor,
         updateVendor,
         deleteVendor,
         deleteMultipleVendors,
-        addCompany,
-        updateCompany,
-        deleteCompany,
-        deleteMultipleCompanies,
-        addCity,
-        updateCity,
-        deleteCity,
-        deleteMultipleCities,
         addCategory,
         updateCategory,
         deleteCategory,
         deleteMultipleCategories,
+        deleteLog,
+        updateLog,
         deleteMultipleLogs,
         addMasterItemName,
         updateMasterItemName,
         deleteMasterItemName,
-        deleteMultipleMasterItemNames
+        deleteMultipleMasterItemNames,
+        addMachineSale,
+        updateMachineSale,
+        deleteMachineSale,
+        deleteMultipleMachineSales
       }}
     >
       {children}

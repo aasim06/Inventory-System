@@ -95,7 +95,7 @@ export default function ReportsPage() {
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
         <AnalyticEcommerce
           title="Total Store Valuation"
-          count={`$${(totalValuation || 0).toLocaleString()}`}
+          count={(totalValuation || 0).toLocaleString()}
           extra="Total Asset Value"
         />
       </Grid>
@@ -182,7 +182,7 @@ export default function ReportsPage() {
                     <TableCell align="center">Total Stock</TableCell>
                     <TableCell align="center">Available Stock</TableCell>
                     <TableCell align="right">Unit Price</TableCell>
-                    <TableCell align="right">Total Value ($)</TableCell>
+                    <TableCell align="right">Total Value</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -223,10 +223,10 @@ export default function ReportsPage() {
                               {item.remainingStock} {item.unit}
                             </Typography>
                           </TableCell>
-                          <TableCell align="right">${item.unitPrice}</TableCell>
+                          <TableCell align="right">{item.unitPrice}</TableCell>
                           <TableCell align="right">
                             <Typography variant="subtitle2" fontWeight={700} color="primary.main">
-                              ${itemValue.toLocaleString()}
+                              {itemValue.toLocaleString()}
                             </Typography>
                           </TableCell>
                         </TableRow>

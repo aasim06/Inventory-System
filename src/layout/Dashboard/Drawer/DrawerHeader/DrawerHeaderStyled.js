@@ -13,7 +13,7 @@ const DrawerHeaderStyled = styled(Box, { shouldForwardProp: (prop) => prop !== '
   variants: [
     {
       props: ({ open }) => open,
-      style: { justifyContent: 'flex-start', paddingLeft: theme.spacing(3) }
+      style: { justifyContent: 'center', paddingLeft: 0 }
     }
   ]
 }));

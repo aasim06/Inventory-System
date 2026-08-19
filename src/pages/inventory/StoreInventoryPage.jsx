@@ -223,7 +223,7 @@ export default function StoreInventoryPage() {
                     </Stack>
                   </TableCell>
 
-                  <TableCell align="right">${item.unitPrice}</TableCell>
+                  <TableCell align="right">{item.unitPrice}</TableCell>
 
                   <TableCell>
                     <Chip label={item.rackLocation || 'Store'} size="small" sx={{ bgcolor: 'grey.100' }} />
@@ -398,7 +398,7 @@ export default function StoreInventoryPage() {
               <Grid container spacing={2}>
                 <Grid item xs={6}>
                   <TextField
-                    label="Unit Price ($)"
+                    label="Unit Price"
                     type="number"
                     fullWidth
                     value={newItem.unitPrice}

@@ -170,7 +170,7 @@ export default function AddItemNamePage() {
       }
     >
       {/* Description Banner */}
-      <Box sx={{ p: 2, mb: 3, bgcolor: 'primary.lighter', borderRadius: 1, border: '1px dashed #1677ff' }}>
+      <Box sx={{ p: 2, mb: 3, bgcolor: 'primary.lighter', borderRadius: 1, border: '1px dashed', borderColor: 'primary.main' }}>
         <Typography variant="subtitle2" color="primary.main" fontWeight={700}>
           💡 Quick Setup: Master Item Names
         </Typography>
@@ -260,7 +260,7 @@ export default function AddItemNamePage() {
 
                     <TableCell>
                       <Stack direction="row" spacing={1} alignItems="center">
-                        <PlusSquareOutlined style={{ color: '#1677ff', fontSize: 16 }} />
+                        <PlusSquareOutlined style={{ color: '#52c41a', fontSize: 16 }} />
                         <Typography variant="subtitle2" fontWeight={700}>
                           {master.name}
                         </Typography>
@@ -335,7 +335,7 @@ export default function AddItemNamePage() {
 
               {/* 3. Price Per Unit */}
               <TextField
-                label="Price Per Unit ($ / Rs)"
+                label="Price Per Unit"
                 type="number"
                 fullWidth
                 required
@@ -448,7 +448,7 @@ export default function AddItemNamePage() {
                 />
 
                 <TextField
-                  label="Price Per Unit ($ / Rs)"
+                  label="Price Per Unit"
                   type="number"
                   fullWidth
                   value={editingItemName.unitPrice || 0}

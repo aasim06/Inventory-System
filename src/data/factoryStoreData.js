@@ -1,22 +1,3 @@
-export const initialCompanies = [
-  {
-    id: 'CMP-1',
-    name: 'Atlas Industrial Corp',
-    description: 'Primary supplier for electrical motors and automation components'
-  },
-  {
-    id: 'CMP-2',
-    name: 'Siemens Pakistan Ltd',
-    description: 'Authorized distributor for PLC modules and industrial sensors'
-  }
-];
-
-export const initialCities = [
-  { id: 'CTY-1', name: 'Karachi', description: 'Head office & primary hub' },
-  { id: 'CTY-2', name: 'Lahore', description: 'Northern region warehouse' },
-  { id: 'CTY-3', name: 'Faisalabad', description: 'Textile machinery store' }
-];
-
 export const initialCategories = [
   { id: 'CAT-1', name: 'Electrical & Motors', description: 'Electric motors, drives, starters' },
   { id: 'CAT-2', name: 'Mechanical Parts', description: 'Bearings, gears, belts, pulleys' },
@@ -249,5 +230,42 @@ export const initialVendors = [
     email: 'support@nationalfasteners.pk',
     category: 'Hardware & Fasteners',
     address: 'I.I. Chundrigar Road, Karachi'
+  }
+];
+
+export const initialMachineSales = [
+  {
+    id: 'MS-95842',
+    customerName: 'Asim Ameer',
+    customerPhone: '+92 300 8765432',
+    cityAddress: 'Lahore',
+    machineName: 'Rehmat 20" Lawn Mower (Petrol Engine)',
+    serialNo: 'RLM-2026-904',
+    qty: 1,
+    unitPrice: 45000,
+    lineTotal: 45000,
+    paidAmount: 45000,
+    balanceAmount: 0,
+    paymentStatus: 'Paid', // Paid, Partial, Unpaid
+    warrantyTerms: '1 Year Motor & Frame Free Service Warranty',
+    dateISO: '2026-08-14T10:30:00Z',
+    time: 'Yesterday, 10:30 AM'
+  },
+  {
+    id: 'MS-95843',
+    customerName: 'Muhammad Riaz',
+    customerPhone: '+92 321 5554321',
+    cityAddress: 'Faisalabad',
+    machineName: 'Rehmat Electric Lawn Cutter 18"',
+    serialNo: 'RLM-2026-912',
+    qty: 2,
+    unitPrice: 32000,
+    lineTotal: 64000,
+    paidAmount: 40000,
+    balanceAmount: 24000,
+    paymentStatus: 'Partial',
+    warrantyTerms: '6 Months Electrical Parts Warranty',
+    dateISO: '2026-08-15T09:15:00Z',
+    time: 'Today, 09:15 AM'
   }
 ];

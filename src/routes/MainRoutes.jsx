@@ -14,11 +14,14 @@ const AddItemNamePage = Loadable(lazy(() => import('pages/inventory/AddItemNameP
 const StockInPage = Loadable(lazy(() => import('pages/inventory/StockInPage')));
 const StockOutPage = Loadable(lazy(() => import('pages/inventory/StockOutPage')));
 const VendorsPage = Loadable(lazy(() => import('pages/inventory/VendorsPage')));
-const CompaniesPage = Loadable(lazy(() => import('pages/inventory/CompaniesPage')));
-const CitiesPage = Loadable(lazy(() => import('pages/inventory/CitiesPage')));
+const MachineSalesPage = Loadable(lazy(() => import('pages/inventory/MachineSalesPage')));
 const CategoriesPage = Loadable(lazy(() => import('pages/inventory/CategoriesPage')));
 const UsageLogPage = Loadable(lazy(() => import('pages/inventory/UsageLogPage')));
 const ReportsPage = Loadable(lazy(() => import('pages/inventory/ReportsPage')));
+const MachineBOMPage = Loadable(lazy(() => import('pages/inventory/MachineBOMPage')));
+const CustomerLedgerPage = Loadable(lazy(() => import('pages/inventory/CustomerLedgerPage')));
+const VendorLedgerPage = Loadable(lazy(() => import('pages/inventory/VendorLedgerPage')));
+const BackupRestorePage = Loadable(lazy(() => import('pages/inventory/BackupRestorePage')));
 
 // render - Overview Utilities
 const Color = Loadable(lazy(() => import('pages/component-overview/color')));
@@ -69,16 +72,24 @@ const MainRoutes = {
           element: <StockOutPage />
         },
         {
+          path: 'bom',
+          element: <MachineBOMPage />
+        },
+        {
+          path: 'machine-sales',
+          element: <MachineSalesPage />
+        },
+        {
+          path: 'customer-ledgers',
+          element: <CustomerLedgerPage />
+        },
+        {
+          path: 'vendor-ledgers',
+          element: <VendorLedgerPage />
+        },
+        {
           path: 'vendors',
           element: <VendorsPage />
-        },
-        {
-          path: 'companies',
-          element: <CompaniesPage />
-        },
-        {
-          path: 'cities',
-          element: <CitiesPage />
         },
         {
           path: 'categories',
@@ -95,6 +106,10 @@ const MainRoutes = {
         {
           path: 'reports',
           element: <ReportsPage />
+        },
+        {
+          path: 'backup-restore',
+          element: <BackupRestorePage />
         }
       ]
     },

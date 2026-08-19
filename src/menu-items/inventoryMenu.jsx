@@ -5,12 +5,14 @@ import {
   ImportOutlined,
   ExportOutlined,
   TeamOutlined,
-  BankOutlined,
-  EnvironmentOutlined,
   AppstoreOutlined,
   HistoryOutlined,
   BarChartOutlined,
-  PlusSquareOutlined
+  PlusSquareOutlined,
+  FileTextOutlined,
+  ToolOutlined,
+  UserOutlined,
+  SafetyCertificateOutlined
 } from '@ant-design/icons';
 
 const icons = {
@@ -19,12 +21,14 @@ const icons = {
   ImportOutlined,
   ExportOutlined,
   TeamOutlined,
-  BankOutlined,
-  EnvironmentOutlined,
   AppstoreOutlined,
   HistoryOutlined,
   BarChartOutlined,
-  PlusSquareOutlined
+  PlusSquareOutlined,
+  FileTextOutlined,
+  ToolOutlined,
+  UserOutlined,
+  SafetyCertificateOutlined
 };
 
 // ==============================|| MENU ITEMS - FACTORY STORE INVENTORY ||============================== //
@@ -64,25 +68,39 @@ const inventoryMenu = {
       icon: icons.ExportOutlined
     },
     {
-      id: 'vendors',
-      title: 'Vendors',
+      id: 'bom',
+      title: 'Machine Recipes (BOM)',
       type: 'item',
-      url: '/inventory/vendors',
+      url: '/inventory/bom',
+      icon: icons.ToolOutlined
+    },
+    {
+      id: 'machine-sales',
+      title: 'Machine Sales & Invoices',
+      type: 'item',
+      url: '/inventory/machine-sales',
+      icon: icons.FileTextOutlined
+    },
+    {
+      id: 'customer-ledgers',
+      title: 'Customer Khaata Ledgers',
+      type: 'item',
+      url: '/inventory/customer-ledgers',
+      icon: icons.UserOutlined
+    },
+    {
+      id: 'vendor-ledgers',
+      title: 'Vendor Payables',
+      type: 'item',
+      url: '/inventory/vendor-ledgers',
       icon: icons.TeamOutlined
     },
     {
-      id: 'companies',
-      title: 'Companies',
+      id: 'vendors',
+      title: 'Vendors & Parties',
       type: 'item',
-      url: '/inventory/companies',
-      icon: icons.BankOutlined
-    },
-    {
-      id: 'cities',
-      title: 'Cities',
-      type: 'item',
-      url: '/inventory/cities',
-      icon: icons.EnvironmentOutlined
+      url: '/inventory/vendors',
+      icon: icons.TeamOutlined
     },
     {
       id: 'categories',
@@ -104,6 +122,13 @@ const inventoryMenu = {
       type: 'item',
       url: '/inventory/reports',
       icon: icons.BarChartOutlined
+    },
+    {
+      id: 'backup-restore',
+      title: 'Data Backup & Restore',
+      type: 'item',
+      url: '/inventory/backup-restore',
+      icon: icons.SafetyCertificateOutlined
     }
   ]
 };

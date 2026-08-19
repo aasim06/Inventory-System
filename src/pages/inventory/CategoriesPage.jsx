@@ -177,7 +177,7 @@ export default function CategoriesPage() {
         <Grid item xs={12} sm={6} sx={{ textAlign: 'right' }}>
           <Typography variant="caption" color="textSecondary">
             {selected.length > 0 ? (
-              <strong style={{ color: '#1677ff' }}>{selected.length} selected</strong>
+              <strong style={{ color: '#52c41a' }}>{selected.length} selected</strong>
             ) : (
               `Total ${filteredCategories.length} Categories`
             )}
