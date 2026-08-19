@@ -162,67 +162,10 @@ export function StoreInventoryProvider({ children }) {
     localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(vendorPayments));
   }, [vendorPayments]);
 
-  // Fetch initial data from Supabase if available
+  // Fetch initial data from Supabase if available (Clean Zero Production Mode)
   useEffect(() => {
     const fetchSupabaseData = async () => {
       try {
-        // Fetch Store Items
-        const { data: dbItems, error: itemsErr } = await supabase.from('store_items').select('*');
-        if (!itemsErr && dbItems && dbItems.length > 0) {
-          const seen = new Set();
-          const mappedItems = dbItems
-            .map((i) => ({
-              id: i.id,
-              itemCode: i.item_code,
-              name: i.name,
-              category: i.category,
-              totalStock: i.total_stock,
-              usedToday: i.used_today,
-              remainingStock: i.remaining_stock,
-              unit: i.unit,
-              unitPrice: i.unit_price,
-              minLevel: i.min_level,
-              rackLocation: i.rack_location,
-              status: i.status
-            }))
-            .filter((i) => {
-              if (i.totalStock === 0 && i.unitPrice === 0 && i.remainingStock === 0) {
-                const key = `${(i.name || '').toLowerCase()}_zero`;
-                if (seen.has(key)) return false;
-                seen.add(key);
-                return false; // remove all zero-price zero-stock test entries
-              }
-              return true;
-            });
-
-          setItems(mappedItems);
-
-          // Clean up ghost rows in Supabase database automatically
-          try {
-            await supabase.from('store_items').delete().eq('total_stock', 0).eq('unit_price', 0);
-          } catch (err) {
-            console.error(err);
-          }
-        }
-
-        // Fetch Vendors
-        const { data: dbVendors, error: vndErr } = await supabase.from('vendors').select('*');
-        if (!vndErr && dbVendors && dbVendors.length > 0) {
-          const mappedVendors = dbVendors.map((v) => ({
-            id: v.id,
-            name: v.name,
-            contactPerson: v.contact_person,
-            phone: v.phone,
-            email: v.email,
-            address: v.address,
-            suppliedCategory: v.supplied_category,
-            totalOrders: v.total_orders,
-            status: v.status,
-            rating: v.rating
-          }));
-          setVendors(mappedVendors);
-        }
-
         // Fetch Categories
         const { data: dbCategories, error: catErr } = await supabase.from('categories').select('*');
         if (!catErr && dbCategories && dbCategories.length > 0) {
@@ -245,29 +188,8 @@ export function StoreInventoryProvider({ children }) {
           }));
           setMasterItemNames(mappedMaster);
         }
-
-        // Fetch Usage Logs
-        const { data: dbLogs, error: logErr } = await supabase.from('usage_logs').select('*').order('created_at', { ascending: false });
-        if (!logErr && dbLogs && dbLogs.length > 0) {
-          const mappedLogs = dbLogs.map((l) => ({
-            id: l.id,
-            itemCode: l.item_code,
-            itemName: l.item_name,
-            qtyUsed: l.qty_used,
-            usedBy: l.used_by,
-            department: l.department,
-            issuedBy: l.issued_by,
-            time: `Today, ${new Date(l.date_iso || l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-            dateISO: l.date_iso || l.created_at,
-            type: l.type,
-            remainingStockAfter: l.remaining_stock_after,
-            status: l.status,
-            notes: l.notes
-          }));
-          setUsageLogs(mappedLogs);
-        }
       } catch (err) {
-        console.log('Supabase connection pending table creation:', err.message);
+        console.log('Supabase connection info:', err.message);
       }
     };
 
