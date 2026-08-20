@@ -1,9 +1,19 @@
 import PropTypes from 'prop-types';
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { initialStoreItems, initialUsageLogs, initialVendors, initialCategories, initialMachineSales } from 'data/factoryStoreData';
 import { supabase } from 'api/supabase';
 
 const StoreInventoryContext = createContext();
+
+const safeParseJSON = (key, fallback = []) => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch (err) {
+    console.error(`SafeJSON Error parsing ${key}:`, err);
+    return fallback;
+  }
+};
 
 const initialMasterItemNames = [
   { id: 'MST-1', name: '3HP Electric Motor (3-Phase)', category: 'Electrical & Motors', defaultUnit: 'pcs' },
@@ -31,34 +41,19 @@ export function StoreInventoryProvider({ children }) {
   }, []);
 
   // 1. Inventory Items State (Clean Zero Start)
-  const [items, setItems] = useState(() => {
-    const saved = localStorage.getItem('rehmat_store_items_v2');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [items, setItems] = useState(() => safeParseJSON('rehmat_store_items_v2', []));
 
   // 2. Usage & Issue Logs State (Clean Zero Start)
-  const [usageLogs, setUsageLogs] = useState(() => {
-    const saved = localStorage.getItem('rehmat_store_usage_logs_v2');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [usageLogs, setUsageLogs] = useState(() => safeParseJSON('rehmat_store_usage_logs_v2', []));
 
   // 3. Vendors / Suppliers State (Clean Zero Start)
-  const [vendors, setVendors] = useState(() => {
-    const saved = localStorage.getItem('rehmat_store_vendors_v2');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [vendors, setVendors] = useState(() => safeParseJSON('rehmat_store_vendors_v2', []));
 
   // 4. Categories State
-  const [categories, setCategories] = useState(() => {
-    const saved = localStorage.getItem('rehmat_store_categories_v2');
-    return saved ? JSON.parse(saved) : initialCategories;
-  });
+  const [categories, setCategories] = useState(() => safeParseJSON('rehmat_store_categories_v2', initialCategories));
 
   // 7. Pre-saved Master Item Names List State
-  const [masterItemNames, setMasterItemNames] = useState(() => {
-    const saved = localStorage.getItem('rehmat_store_master_item_names_v2');
-    return saved ? JSON.parse(saved) : initialMasterItemNames;
-  });
+  const [masterItemNames, setMasterItemNames] = useState(() => safeParseJSON('rehmat_store_master_item_names_v2', initialMasterItemNames));
 
   const initialMachineModels = [
     'Rehmat 20" Lawn Mower (Petrol Engine)',
@@ -69,21 +64,14 @@ export function StoreInventoryProvider({ children }) {
   ];
 
   // 8. Customer Machine Sales State (Clean Zero Start)
-  const [machineSales, setMachineSales] = useState(() => {
-    const saved = localStorage.getItem('rehmat_store_machine_sales_v2');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [machineSales, setMachineSales] = useState(() => safeParseJSON('rehmat_store_machine_sales_v2', []));
 
   // 9. Master Machine Models Catalog State
-  const [machineModels, setMachineModels] = useState(() => {
-    const saved = localStorage.getItem('store_machine_models');
-    return saved ? JSON.parse(saved) : initialMachineModels;
-  });
+  const [machineModels, setMachineModels] = useState(() => safeParseJSON('store_machine_models', initialMachineModels));
 
   // 10. Machine BOM Recipes State
   const [machineRecipes, setMachineRecipes] = useState(() => {
-    const saved = localStorage.getItem('store_machine_recipes');
-    const parsed = saved ? JSON.parse(saved) : null;
+    const parsed = safeParseJSON('store_machine_recipes', null);
     if (parsed && Array.isArray(parsed) && parsed.length > 0) {
       // Filter out test entries like 'Emmami' if user wants real lawn mower recipe
       const clean = parsed.filter(r => !(r.modelName || '').toLowerCase().includes('emmami'));
@@ -114,16 +102,10 @@ export function StoreInventoryProvider({ children }) {
   });
 
   // 11. Customer Payments & Ledger Entries State (Clean Zero Start)
-  const [customerPayments, setCustomerPayments] = useState(() => {
-    const saved = localStorage.getItem('rehmat_store_customer_payments_v2');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [customerPayments, setCustomerPayments] = useState(() => safeParseJSON('rehmat_store_customer_payments_v2', []));
 
   // 12. Vendor Payments & Ledger Entries State (Clean Zero Start)
-  const [vendorPayments, setVendorPayments] = useState(() => {
-    const saved = localStorage.getItem('rehmat_store_vendor_payments_v2');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [vendorPayments, setVendorPayments] = useState(() => safeParseJSON('rehmat_store_vendor_payments_v2', []));
 
   // Sync state to LocalStorage as secondary backup
   useEffect(() => {
@@ -1049,72 +1031,115 @@ export function StoreInventoryProvider({ children }) {
     return { success: true, message: 'All demo data reset to 0! System is now clean.' };
   };
 
-  // Computed Metrics
-  const totalInventoryCount = items.reduce((acc, i) => acc + i.remainingStock, 0);
-  const totalValuation = items.reduce((acc, i) => acc + i.remainingStock * i.unitPrice, 0);
+  // 13. Memoized Speed Optimizations & Computed Metrics
+  const totalInventoryCount = useMemo(
+    () => items.reduce((acc, i) => acc + (Number(i.remainingStock) || 0), 0),
+    [items]
+  );
 
-  const todayLogs = usageLogs.filter((log) => log.time && log.time.includes('Today'));
-  const todayStockInQty = todayLogs.filter((log) => log.type.includes('IN')).reduce((acc, log) => acc + (parseInt(log.qtyUsed) || 0), 0);
-  const todayStockOutQty = todayLogs.filter((log) => log.type.includes('OUT')).reduce((acc, log) => acc + (parseInt(log.qtyUsed) || 0), 0);
+  const totalValuation = useMemo(
+    () => items.reduce((acc, i) => acc + ((Number(i.remainingStock) || 0) * (Number(i.unitPrice) || 0)), 0),
+    [items]
+  );
 
-  const lowStockAlerts = items.filter((i) => i.remainingStock <= i.minLevel);
+  const todayISO = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  const todayLogs = useMemo(
+    () => usageLogs.filter((log) => (log.time && log.time.includes('Today')) || (log.dateISO && log.dateISO.startsWith(todayISO))),
+    [usageLogs, todayISO]
+  );
+
+  const todayStockInQty = useMemo(
+    () => todayLogs.filter((log) => log.type && log.type.includes('IN')).reduce((acc, log) => acc + (parseInt(log.qtyUsed) || 0), 0),
+    [todayLogs]
+  );
+
+  const todayStockOutQty = useMemo(
+    () => todayLogs.filter((log) => log.type && log.type.includes('OUT')).reduce((acc, log) => acc + (parseInt(log.qtyUsed) || 0), 0),
+    [todayLogs]
+  );
+
+  const lowStockAlerts = useMemo(
+    () => items.filter((i) => (Number(i.remainingStock) || 0) <= (Number(i.minLevel) || 0)),
+    [items]
+  );
+
+  // 14. Memoized Context Provider Value (Prevents Unnecessary Cascade Re-renders)
+  const contextValue = useMemo(
+    () => ({
+      items,
+      usageLogs,
+      vendors,
+      categories,
+      masterItemNames,
+      machineSales,
+      machineModels,
+      machineRecipes,
+      customerPayments,
+      vendorPayments,
+      addMachineModel,
+      saveMachineRecipe,
+      deleteMachineRecipe,
+      assembleMachine,
+      addCustomerPayment,
+      addVendorPayment,
+      exportFullBackupData,
+      importFullBackupData,
+      resetAllDataToZero,
+      totalInventoryCount,
+      totalValuation,
+      dailyUsageCount: todayStockOutQty,
+      todayStockInQty,
+      todayStockOutQty,
+      lowStockAlerts,
+      issueStock,
+      receiveStock,
+      addNewItem,
+      updateItem,
+      deleteItem,
+      deleteMultipleItems,
+      cleanDuplicateItems,
+      addVendor,
+      updateVendor,
+      deleteVendor,
+      deleteMultipleVendors,
+      addCategory,
+      updateCategory,
+      deleteCategory,
+      deleteMultipleCategories,
+      deleteLog,
+      updateLog,
+      deleteMultipleLogs,
+      addMasterItemName,
+      updateMasterItemName,
+      deleteMasterItemName,
+      deleteMultipleMasterItemNames,
+      addMachineSale,
+      updateMachineSale,
+      deleteMachineSale,
+      deleteMultipleMachineSales
+    }),
+    [
+      items,
+      usageLogs,
+      vendors,
+      categories,
+      masterItemNames,
+      machineSales,
+      machineModels,
+      machineRecipes,
+      customerPayments,
+      vendorPayments,
+      totalInventoryCount,
+      totalValuation,
+      todayStockInQty,
+      todayStockOutQty,
+      lowStockAlerts
+    ]
+  );
 
   return (
-    <StoreInventoryContext.Provider
-      value={{
-        items,
-        usageLogs,
-        vendors,
-        categories,
-        masterItemNames,
-        machineSales,
-        machineModels,
-        machineRecipes,
-        customerPayments,
-        vendorPayments,
-        addMachineModel,
-        saveMachineRecipe,
-        deleteMachineRecipe,
-        assembleMachine,
-        addCustomerPayment,
-        addVendorPayment,
-        exportFullBackupData,
-        importFullBackupData,
-        resetAllDataToZero,
-        totalInventoryCount,
-        totalValuation,
-        dailyUsageCount: todayStockOutQty,
-        todayStockInQty,
-        todayStockOutQty,
-        lowStockAlerts,
-        issueStock,
-        receiveStock,
-        addNewItem,
-        updateItem,
-        deleteItem,
-        deleteMultipleItems,
-        cleanDuplicateItems,
-        addVendor,
-        updateVendor,
-        deleteVendor,
-        deleteMultipleVendors,
-        addCategory,
-        updateCategory,
-        deleteCategory,
-        deleteMultipleCategories,
-        deleteLog,
-        updateLog,
-        deleteMultipleLogs,
-        addMasterItemName,
-        updateMasterItemName,
-        deleteMasterItemName,
-        deleteMultipleMasterItemNames,
-        addMachineSale,
-        updateMachineSale,
-        deleteMachineSale,
-        deleteMultipleMachineSales
-      }}
-    >
+    <StoreInventoryContext.Provider value={contextValue}>
       {children}
     </StoreInventoryContext.Provider>
   );

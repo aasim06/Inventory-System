@@ -37,6 +37,7 @@ import { ExportOutlined, SearchOutlined, ArrowDownOutlined, DeleteOutlined, Edit
 
 // project imports
 import MainCard from 'components/MainCard';
+import rehmatLogo from 'assets/images/rehmat-logo.jpg';
 
 export default function StockOutPage() {
   const { items = [], vendors = [], masterItemNames = [], usageLogs = [], issueStock, deleteLog, updateLog, deleteMultipleLogs } = useStoreInventory();
@@ -819,10 +820,29 @@ export default function StockOutPage() {
             }, 0);
 
             return (
-              <Box id="printable-invoice-stockout" sx={{ p: 1, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
-                <Typography variant="h3" fontWeight={800} align="center" sx={{ color: '#ff4d4f', mb: 0.5, letterSpacing: '0.5px' }}>
-                  REHMAT LAWN MOWERS
-                </Typography>
+              <Box id="printable-invoice-stockout" sx={{ position: 'relative', overflow: 'hidden', p: { xs: 2, sm: 3 }, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
+                {/* 🏢 Watermark Background Logo */}
+                <Box
+                  component="img"
+                  src={rehmatLogo}
+                  alt="Watermark Logo"
+                  sx={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: '55%',
+                    maxWidth: 360,
+                    opacity: 0.08,
+                    pointerEvents: 'none',
+                    zIndex: 0,
+                    borderRadius: '50%'
+                  }}
+                />
+                <Box sx={{ position: 'relative', zIndex: 1 }}>
+                  <Typography variant="h3" fontWeight={800} align="center" sx={{ color: '#ff4d4f', mb: 0.5, letterSpacing: '0.5px' }}>
+                    REHMAT LAWN MOWERS
+                  </Typography>
                 <Typography variant="subtitle1" fontWeight={700} align="center" sx={{ color: '#ff4d4f', mb: 0.5 }}>
                   FACTORY STORE INVENTORY & STOCK ISSUANCE
                 </Typography>
@@ -899,7 +919,8 @@ export default function StockOutPage() {
                   </Typography>
                 </Box>
               </Box>
-            );
+            </Box>
+          );
           })()}
         </DialogContent>
 

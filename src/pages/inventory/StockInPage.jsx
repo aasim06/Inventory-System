@@ -37,6 +37,7 @@ import { ImportOutlined, SearchOutlined, ArrowUpOutlined, PlusOutlined, DeleteOu
 
 // project imports
 import MainCard from 'components/MainCard';
+import rehmatLogo from 'assets/images/rehmat-logo.jpg';
 
 export default function StockInPage() {
   const { items = [], vendors = [], masterItemNames = [], usageLogs = [], receiveStock, addNewItem, deleteLog, updateLog, deleteMultipleLogs } = useStoreInventory();
@@ -754,10 +755,29 @@ export default function StockInPage() {
             }, 0);
 
             return (
-              <Box id="printable-invoice-stockin" sx={{ p: 1, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
-                <Typography variant="h3" fontWeight={800} align="center" sx={{ color: '#10b981', mb: 0.5, letterSpacing: '0.5px' }}>
-                  REHMAT LAWN MOWERS
-                </Typography>
+              <Box id="printable-invoice-stockin" sx={{ position: 'relative', overflow: 'hidden', p: { xs: 2, sm: 3 }, bgcolor: '#ffffff', color: '#111827', borderRadius: 1 }}>
+                {/* 🏢 Watermark Background Logo */}
+                <Box
+                  component="img"
+                  src={rehmatLogo}
+                  alt="Watermark Logo"
+                  sx={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: '55%',
+                    maxWidth: 360,
+                    opacity: 0.08,
+                    pointerEvents: 'none',
+                    zIndex: 0,
+                    borderRadius: '50%'
+                  }}
+                />
+                <Box sx={{ position: 'relative', zIndex: 1 }}>
+                  <Typography variant="h3" fontWeight={800} align="center" sx={{ color: '#10b981', mb: 0.5, letterSpacing: '0.5px' }}>
+                    REHMAT LAWN MOWERS
+                  </Typography>
                 <Typography variant="subtitle1" fontWeight={700} align="center" sx={{ color: '#10b981', mb: 0.5 }}>
                   FACTORY STORE INVENTORY & RECEIVING
                 </Typography>
@@ -834,7 +854,8 @@ export default function StockInPage() {
                   </Typography>
                 </Box>
               </Box>
-            );
+            </Box>
+          );
           })()}
         </DialogContent>
 

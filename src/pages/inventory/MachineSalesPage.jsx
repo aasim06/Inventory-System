@@ -47,6 +47,7 @@ import {
 
 // project imports
 import MainCard from 'components/MainCard';
+import rehmatLogo from 'assets/images/rehmat-logo.jpg';
 
 const defaultMachineModels = [
   'Rehmat 20" Lawn Mower (Petrol Engine)',
@@ -724,9 +725,27 @@ export default function MachineSalesPage() {
             ];
 
             return (
-              <Box id="printable-machine-invoice" sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: '#ffffff', color: '#1e293b', borderRadius: 1 }}>
+              <Box id="printable-machine-invoice" sx={{ position: 'relative', overflow: 'hidden', p: { xs: 2, sm: 3 }, bgcolor: '#ffffff', color: '#1e293b', borderRadius: 1 }}>
+                {/* 🏢 Watermark Background Logo */}
+                <Box
+                  component="img"
+                  src={rehmatLogo}
+                  alt="Watermark Logo"
+                  sx={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: '55%',
+                    maxWidth: 360,
+                    opacity: 0.08,
+                    pointerEvents: 'none',
+                    zIndex: 0,
+                    borderRadius: '50%'
+                  }}
+                />
                 {/* 📄 Simple & Elegant Clean Header */}
-                <Box sx={{ pb: 1.5, mb: 2, borderBottom: '2px solid #0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Box sx={{ position: 'relative', zIndex: 1, pb: 1.5, mb: 2, borderBottom: '2px solid #0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Box>
                     <Typography variant="h4" fontWeight={800} sx={{ color: '#166534', letterSpacing: '0.5px' }}>
                       REHMAT LAWN MOWERS

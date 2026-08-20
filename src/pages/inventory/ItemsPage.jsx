@@ -28,6 +28,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -48,6 +49,19 @@ export default function ItemsPage() {
   // Search & Category filter
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   // Checkbox Selection State
   const [selected, setSelected] = useState([]);
@@ -168,6 +182,26 @@ export default function ItemsPage() {
     setStockInOpen(false);
   };
 
+  const handleFormKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      const inputs = Array.from(
+        e.currentTarget.querySelectorAll('input, select')
+      ).filter((el) => !el.disabled && el.type !== 'hidden');
+
+      const currentIndex = inputs.indexOf(e.target);
+      if (currentIndex > -1 && currentIndex < inputs.length - 1) {
+        e.preventDefault();
+        const nextInput = inputs[currentIndex + 1];
+        if (nextInput) {
+          nextInput.focus();
+          if (typeof nextInput.select === 'function') {
+            nextInput.select();
+          }
+        }
+      }
+    }
+  };
+
   const handleAddItemSubmit = (e) => {
     e.preventDefault();
     if (!newItem.name) {
@@ -181,7 +215,7 @@ export default function ItemsPage() {
       name: '',
       category: 'Electrical & Motors',
       totalStock: 50,
-      unit: 'pcs',
+      unit: 'PCS',
       unitPrice: 25,
       minLevel: 10,
       rackLocation: 'Rack A-01'
@@ -214,68 +248,187 @@ export default function ItemsPage() {
   };
 
   return (
-    <MainCard
-      title="Store Inventory Items"
-      secondary={
-        <Stack direction="row" spacing={1.5}>
-          {selected.length > 0 && (
-            <Button
-              variant="contained"
-              color="error"
-              startIcon={<DeleteOutlined />}
-              onClick={() => setBulkDeleteDialogOpen(true)}
-            >
-              Delete Selected ({selected.length})
-            </Button>
-          )}
-          <Button variant="outlined" color="warning" onClick={cleanDuplicateItems}>
-            Clean Duplicates
-          </Button>
-          <Button variant="contained" startIcon={<PlusOutlined />} onClick={() => setAddDrawerOpen(true)}>
-            Add New Item
-          </Button>
-        </Stack>
-      }
-    >
-      {/* Search & Category Filter Header */}
-      <Grid container spacing={2} sx={{ mb: 3, alignItems: 'center' }}>
-        <Grid item xs={12} sm={5}>
-          <OutlinedInput
-            fullWidth
-            placeholder="Search items, SKU code, rack location..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            startAdornment={
-              <InputAdornment position="start">
-                <SearchOutlined />
-              </InputAdornment>
-            }
-          />
-        </Grid>
+    <Box>
+      {/* 1. TOP SECTION: Add New Store Inventory Item Card */}
+      <MainCard title="➕ Add New Store Inventory Item" sx={{ mb: 3 }}>
+        <form onSubmit={handleAddItemSubmit} onKeyDown={handleFormKeyDown}>
+          <Box
+            sx={{
+              '& .MuiInputBase-root': {
+                height: 40,
+                fontSize: '0.875rem'
+              },
+              '& .MuiInputLabel-root': {
+                fontSize: '0.8125rem'
+              }
+            }}
+          >
+            <Grid container spacing={2}>
+              {/* ROW 1: Item Name, SKU, Location, Unit */}
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Autocomplete
+                  freeSolo
+                  options={masterItemNames.map((m) => m.name)}
+                  value={newItem.name}
+                  onInputChange={(event, newInputValue) => {
+                    const matchedMaster = masterItemNames.find((m) => m.name.toLowerCase() === (newInputValue || '').toLowerCase());
+                    setNewItem({
+                      ...newItem,
+                      name: newInputValue || '',
+                      category: matchedMaster ? matchedMaster.category : 'General',
+                      unit: matchedMaster ? matchedMaster.defaultUnit : newItem.unit
+                    });
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="ITEM NAME *"
+                      required
+                      placeholder="e.g. 3HP Electric Motor"
+                    />
+                  )}
+                />
+              </Grid>
 
-        <Grid item xs={12} sm="auto">
-          <FormControl sx={{ minWidth: 240, width: 240 }}>
-            <InputLabel>Category</InputLabel>
-            <Select value={selectedCategory} label="Category" onChange={(e) => setSelectedCategory(e.target.value)}>
-              {categoryFilterOptions.map((cat) => (
-                <MenuItem key={cat} value={cat}>
-                  {cat}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <TextField
+                  label="SKU CODE / SHORT ID *"
+                  fullWidth
+                  required
+                  placeholder="e.g. SKU-84564564"
+                  value={newItem.itemCode}
+                  onChange={(e) => setNewItem({ ...newItem, itemCode: e.target.value })}
+                />
+              </Grid>
 
-        <Grid item xs={12} sm={3} sx={{ textAlign: 'right' }}>
-          <Typography variant="caption" color="textSecondary">
-            {selected.length > 0 ? (
-              <strong style={{ color: '#ff4d4f' }}>{selected.length} items selected for deletion</strong>
-            ) : (
-              `Total ${filteredItems.length} Store Items`
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <TextField
+                  label="RACK / LOCATION"
+                  fullWidth
+                  placeholder="e.g. Rack A-01"
+                  value={newItem.rackLocation}
+                  onChange={(e) => setNewItem({ ...newItem, rackLocation: e.target.value })}
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                <TextField
+                  select
+                  label="UNIT *"
+                  fullWidth
+                  required
+                  value={newItem.unit}
+                  onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
+                >
+                  {UNIT_OPTIONS.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+
+              {/* ROW 2: Stock, Price, Min Level & Save Action */}
+              <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                <TextField
+                  label="OPENING STOCK *"
+                  type="number"
+                  fullWidth
+                  required
+                  inputProps={{ min: 0 }}
+                  value={newItem.totalStock}
+                  onChange={(e) => setNewItem({ ...newItem, totalStock: parseInt(e.target.value) || 0 })}
+                />
+              </Grid>
+
+              <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                <TextField
+                  label="UNIT PRICE (RS) *"
+                  type="number"
+                  fullWidth
+                  required
+                  inputProps={{ min: 0, step: 'any' }}
+                  value={newItem.unitPrice}
+                  onChange={(e) => setNewItem({ ...newItem, unitPrice: parseFloat(e.target.value) || 0 })}
+                />
+              </Grid>
+
+              <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                <TextField
+                  label="MIN THRESHOLD *"
+                  type="number"
+                  fullWidth
+                  required
+                  inputProps={{ min: 1 }}
+                  value={newItem.minLevel}
+                  onChange={(e) => setNewItem({ ...newItem, minLevel: parseInt(e.target.value) || 5 })}
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 12, md: 3 }}>
+                <Button
+                  variant="contained"
+                  color="success"
+                  fullWidth
+                  type="submit"
+                  startIcon={<PlusOutlined />}
+                  sx={{ fontWeight: 800, height: 40, borderRadius: 2 }}
+                >
+                  Save New Store Item
+                </Button>
+              </Grid>
+            </Grid>
+          </Box>
+        </form>
+      </MainCard>
+
+      {/* 2. BOTTOM SECTION: Store Inventory Items Table Card */}
+      <MainCard
+        title="Store Inventory Items"
+        secondary={
+          <Stack direction="row" spacing={1.5}>
+            {selected.length > 0 && (
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<DeleteOutlined />}
+                onClick={() => setBulkDeleteDialogOpen(true)}
+              >
+                Delete Selected ({selected.length})
+              </Button>
             )}
-          </Typography>
+            <Button variant="outlined" color="warning" onClick={cleanDuplicateItems}>
+              Clean Duplicates
+            </Button>
+          </Stack>
+        }
+      >
+        {/* Search Header */}
+        <Grid container spacing={2} sx={{ mb: 3, alignItems: 'center' }}>
+          <Grid item xs={12} sm={8}>
+            <OutlinedInput
+              fullWidth
+              placeholder="Search items, SKU code, rack location..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              startAdornment={
+                <InputAdornment position="start">
+                  <SearchOutlined />
+                </InputAdornment>
+              }
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={4} sx={{ textAlign: 'right' }}>
+            <Typography variant="caption" color="textSecondary">
+              {selected.length > 0 ? (
+                <strong style={{ color: '#ff4d4f' }}>{selected.length} items selected for deletion</strong>
+              ) : (
+                `Total ${filteredItems.length} Store Items`
+              )}
+            </Typography>
+          </Grid>
         </Grid>
-      </Grid>
 
       {/* Items Table */}
       <TableContainer>
@@ -294,7 +447,6 @@ export default function ItemsPage() {
               <TableCell>Item Name</TableCell>
               <TableCell>SKU Code</TableCell>
               <TableCell align="right">Price Per Unit</TableCell>
-              <TableCell>Category</TableCell>
               <TableCell align="center">Units</TableCell>
               <TableCell align="center">Stock Quantity</TableCell>
               <TableCell align="center">Min Threshold</TableCell>
@@ -302,91 +454,100 @@ export default function ItemsPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredItems.map((item) => {
-              const isLow = item.remainingStock <= item.minLevel;
-              const isItemSelected = isSelected(item.id);
+            {filteredItems
+              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+              .map((item) => {
+                const isLow = item.remainingStock <= item.minLevel;
+                const isItemSelected = isSelected(item.id);
 
-              return (
-                <TableRow key={item.id} hover selected={isItemSelected}>
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      color="primary"
-                      checked={isItemSelected}
-                      onChange={(e) => handleSelectOne(e, item.id)}
-                    />
-                  </TableCell>
+                return (
+                  <TableRow key={item.id} hover selected={isItemSelected}>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        color="primary"
+                        checked={isItemSelected}
+                        onChange={(e) => handleSelectOne(e, item.id)}
+                      />
+                    </TableCell>
 
-                  <TableCell>
-                    <Typography variant="subtitle1" fontWeight={700} color="primary.main">
-                      {item.name}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell>
-                    <Typography variant="subtitle2" fontWeight={600}>
-                      {item.itemCode}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell align="right">
-                    <Typography variant="subtitle2" fontWeight={600}>
-                      {item.unitPrice}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell>
-                    <Chip label={item.category} size="small" variant="light" color="primary" />
-                  </TableCell>
-
-                  <TableCell align="center">
-                    <Chip label={item.unit} size="small" sx={{ bgcolor: 'grey.100' }} />
-                  </TableCell>
-
-                  <TableCell align="center">
-                    <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
-                      <Typography variant="subtitle1" fontWeight={700} color={isLow ? 'error.main' : 'success.main'}>
-                        {item.remainingStock}
+                    <TableCell>
+                      <Typography variant="subtitle1" fontWeight={700} color="primary.main">
+                        {item.name}
                       </Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        / {item.totalStock} {item.unit}
-                      </Typography>
-                    </Stack>
-                  </TableCell>
+                    </TableCell>
 
-                  <TableCell align="center">
-                    <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
-                      <Typography variant="subtitle2" fontWeight={600} color={isLow ? 'warning.main' : 'textSecondary'}>
-                        {item.minLevel} {item.unit}
+                    <TableCell>
+                      <Typography variant="subtitle2" fontWeight={600}>
+                        {item.itemCode}
                       </Typography>
-                      {isLow && (
-                        <Tooltip title={`Low Stock Alert! Current stock (${item.remainingStock}) is below minimum threshold (${item.minLevel})`}>
-                          <Chip icon={<WarningOutlined />} label="Low" size="small" color="warning" />
+                    </TableCell>
+
+                    <TableCell align="right">
+                      <Typography variant="subtitle2" fontWeight={600}>
+                        {item.unitPrice}
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell align="center">
+                      <Chip label={item.unit} size="small" sx={{ bgcolor: 'grey.100' }} />
+                    </TableCell>
+
+                    <TableCell align="center">
+                      <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
+                        <Typography variant="subtitle1" fontWeight={700} color={isLow ? 'error.main' : 'success.main'}>
+                          {item.remainingStock}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                          / {item.totalStock} {item.unit}
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+
+                    <TableCell align="center">
+                      <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
+                        <Typography variant="subtitle2" fontWeight={600} color={isLow ? 'warning.main' : 'textSecondary'}>
+                          {item.minLevel} {item.unit}
+                        </Typography>
+                        {isLow && (
+                          <Tooltip title={`Low Stock Alert! Current stock (${item.remainingStock}) is below minimum threshold (${item.minLevel})`}>
+                            <Chip icon={<WarningOutlined />} label="Low" size="small" color="warning" />
+                          </Tooltip>
+                        )}
+                      </Stack>
+                    </TableCell>
+
+                    <TableCell align="center">
+                      <Stack direction="row" spacing={1} justifyContent="center">
+                        <Tooltip title="Edit Item">
+                          <IconButton color="primary" size="small" onClick={() => handleOpenEdit(item)}>
+                            <EditOutlined />
+                          </IconButton>
                         </Tooltip>
-                      )}
-                    </Stack>
-                  </TableCell>
 
-                  <TableCell align="center">
-                    <Stack direction="row" spacing={1} justifyContent="center">
-                      <Tooltip title="Edit Item">
-                        <IconButton color="primary" size="small" onClick={() => handleOpenEdit(item)}>
-                          <EditOutlined />
-                        </IconButton>
-                      </Tooltip>
-
-                      <Tooltip title="Delete Item">
-                        <IconButton color="error" size="small" onClick={() => handleOpenDelete(item)}>
-                          <DeleteOutlined />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                        <Tooltip title="Delete Item">
+                          <IconButton color="error" size="small" onClick={() => handleOpenDelete(item)}>
+                            <DeleteOutlined />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
           </TableBody>
         </Table>
       </TableContainer>
+
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25, 50]}
+        component="div"
+        count={filteredItems.length}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+      />
+      </MainCard>
 
       {/* Modal 1: Stock Out */}
       <Dialog open={stockOutOpen} onClose={() => setStockOutOpen(false)} maxWidth="xs" fullWidth>
@@ -472,130 +633,7 @@ export default function ItemsPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Drawer 3: Add New Item (7 Inputs Form) */}
-      <Drawer anchor="right" open={addDrawerOpen} onClose={() => setAddDrawerOpen(false)}>
-        <Box sx={{ width: 420, p: 3 }}>
-          <Typography variant="h4" sx={{ mb: 3 }}>
-            ➕ Add New Item to Store
-          </Typography>
 
-          <form onSubmit={handleAddItemSubmit}>
-            <Stack spacing={2.5}>
-              {/* 1. Item Name */}
-              <Autocomplete
-                freeSolo
-                options={masterItemNames.map((m) => m.name)}
-                value={newItem.name}
-                onInputChange={(event, newInputValue) => {
-                  const matchedMaster = masterItemNames.find((m) => m.name.toLowerCase() === newInputValue.toLowerCase());
-                  setNewItem({
-                    ...newItem,
-                    name: newInputValue,
-                    category: matchedMaster ? matchedMaster.category : newItem.category,
-                    unit: matchedMaster ? matchedMaster.defaultUnit : newItem.unit
-                  });
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Item Name"
-                    required
-                    placeholder="e.g. 3HP Electric Motor or type new"
-                  />
-                )}
-              />
-
-              {/* 2. SKU Code */}
-              <TextField
-                label="SKU Code / Short ID"
-                fullWidth
-                required
-                placeholder="e.g. SKU-84564564"
-                value={newItem.itemCode}
-                onChange={(e) => setNewItem({ ...newItem, itemCode: e.target.value })}
-              />
-
-              {/* 3. Price Per Unit */}
-              <TextField
-                label="Price Per Unit"
-                type="number"
-                fullWidth
-                required
-                inputProps={{ min: 0, step: 'any' }}
-                value={newItem.unitPrice}
-                onChange={(e) => setNewItem({ ...newItem, unitPrice: parseFloat(e.target.value) || 0 })}
-              />
-
-              {/* 4. Category */}
-              <TextField
-                select
-                label="Category"
-                fullWidth
-                required
-                value={newItem.category}
-                onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
-              >
-                {(categories.length > 0
-                  ? categories.map((c) => c.name)
-                  : ['Electrical & Motors', 'Mechanical Parts', 'Sensors & Automation', 'Hydraulics', 'Pneumatics', 'Raw Materials', 'General']
-                ).map((cat) => (
-                  <MenuItem key={cat} value={cat}>
-                    {cat}
-                  </MenuItem>
-                ))}
-              </TextField>
-
-              {/* 5. Units */}
-              <TextField
-                select
-                id="itemUnit"
-                label="Units"
-                fullWidth
-                required
-                value={newItem.unit}
-                onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-              >
-                {UNIT_OPTIONS.map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option}
-                  </MenuItem>
-                ))}
-              </TextField>
-
-              {/* 6. Initial Stock Quantity */}
-              <TextField
-                label="Initial Stock Quantity"
-                type="number"
-                fullWidth
-                required
-                inputProps={{ min: 0 }}
-                value={newItem.totalStock}
-                onChange={(e) => setNewItem({ ...newItem, totalStock: parseInt(e.target.value) || 0 })}
-              />
-
-              {/* 7. Min Threshold */}
-              <TextField
-                label="Min Threshold (Low Stock Warning At)"
-                type="number"
-                fullWidth
-                required
-                inputProps={{ min: 1 }}
-                value={newItem.minLevel}
-                onChange={(e) => setNewItem({ ...newItem, minLevel: parseInt(e.target.value) || 5 })}
-              />
-
-              <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
-                <Button variant="outlined" color="secondary" onClick={() => setAddDrawerOpen(false)}>
-                  Cancel
-                </Button>
-                <Button variant="contained" type="submit">
-                  Save Item
-                </Button>
-              </Stack>
-            </Stack>
-          </form>
-        </Box>
-      </Drawer>
 
       {/* Drawer 4: Edit Item (7 Inputs Form) */}
       <Drawer anchor="right" open={editDrawerOpen} onClose={() => setEditDrawerOpen(false)}>
@@ -754,6 +792,6 @@ export default function ItemsPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </MainCard>
+    </Box>
   );
 }
