@@ -67,13 +67,7 @@ const inventoryMenu = {
       url: '/inventory/stock-out',
       icon: icons.ExportOutlined
     },
-    {
-      id: 'bom',
-      title: 'Machine Recipes (BOM)',
-      type: 'item',
-      url: '/inventory/bom',
-      icon: icons.ToolOutlined
-    },
+
     {
       id: 'machine-sales',
       title: 'Machine Sales & Invoices',
