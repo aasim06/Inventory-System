@@ -144,38 +144,173 @@ export function StoreInventoryProvider({ children }) {
     localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(vendorPayments));
   }, [vendorPayments]);
 
-  // Fetch initial data from Supabase if available (Clean Zero Production Mode)
-  useEffect(() => {
-    const fetchSupabaseData = async () => {
-      try {
-        // Fetch Categories
-        const { data: dbCategories, error: catErr } = await supabase.from('categories').select('*');
-        if (!catErr && dbCategories && dbCategories.length > 0) {
-          const mappedCategories = dbCategories.map((c) => ({
-            id: c.id,
-            name: c.name,
-            description: c.description
-          }));
-          setCategories(mappedCategories);
+  // Fetch initial data from Supabase for multi-device sync
+  const fetchSupabaseData = async () => {
+    try {
+      // 1. Fetch Items
+      const { data: dbItems, error: itemsErr } = await supabase.from('items').select('*');
+      if (!itemsErr && dbItems && dbItems.length > 0) {
+        const mappedItems = dbItems.map((i) => ({
+          id: i.id,
+          name: i.name,
+          itemCode: i.sku_code || i.id,
+          category: i.category || 'General',
+          unit: i.unit || 'PCS',
+          totalStock: parseFloat(i.current_stock) || 0,
+          usedToday: 0,
+          remainingStock: parseFloat(i.current_stock) || 0,
+          unitPrice: parseFloat(i.unit_price) || 0,
+          minLevel: parseFloat(i.min_threshold) || 10,
+          rackLocation: i.location || 'Main Store',
+          status: parseFloat(i.current_stock) <= 0 ? 2 : parseFloat(i.current_stock) <= (parseFloat(i.min_threshold) || 10) ? 0 : 1
+        }));
+        setItems(mappedItems);
+      } else {
+        // Fallback check store_items
+        const { data: dbStoreItems } = await supabase.from('store_items').select('*');
+        if (dbStoreItems && dbStoreItems.length > 0) {
+          setItems(dbStoreItems.map(i => ({
+            id: i.id,
+            name: i.name,
+            itemCode: i.item_code || i.id,
+            category: i.category || 'General',
+            unit: i.unit || 'PCS',
+            totalStock: parseFloat(i.total_stock) || 0,
+            usedToday: parseFloat(i.used_today) || 0,
+            remainingStock: parseFloat(i.remaining_stock) || 0,
+            unitPrice: parseFloat(i.unit_price) || 0,
+            minLevel: parseFloat(i.min_level) || 10,
+            rackLocation: i.rack_location || 'Main Store',
+            status: i.status || 1
+          })));
         }
-
-        // Fetch Master Item Names
-        const { data: dbMaster, error: mstErr } = await supabase.from('master_item_names').select('*');
-        if (!mstErr && dbMaster && dbMaster.length > 0) {
-          const mappedMaster = dbMaster.map((m) => ({
-            id: m.id,
-            name: m.name,
-            category: m.category,
-            defaultUnit: m.default_unit
-          }));
-          setMasterItemNames(mappedMaster);
-        }
-      } catch (err) {
-        console.log('Supabase connection info:', err.message);
       }
-    };
 
+      // 2. Fetch Usage Logs
+      const { data: dbLogs, error: logErr } = await supabase.from('usage_logs').select('*').order('timestamp', { ascending: false });
+      if (!logErr && dbLogs && dbLogs.length > 0) {
+        setUsageLogs(dbLogs.map(l => ({
+          id: l.id,
+          type: l.type,
+          itemCode: l.item_code || l.item_id,
+          itemName: l.item_name,
+          qtyUsed: parseFloat(l.qty_used) || 1,
+          unitPrice: parseFloat(l.unit_price) || 0,
+          lineTotal: parseFloat(l.line_total) || 0,
+          usedBy: l.used_by,
+          department: l.department || 'Store',
+          issuedBy: l.issued_by || 'Store Manager',
+          time: l.time || new Date(l.timestamp).toLocaleString(),
+          dateISO: l.timestamp || new Date().toISOString()
+        })));
+      }
+
+      // 3. Fetch Vendors
+      const { data: dbVendors, error: vndErr } = await supabase.from('vendors').select('*');
+      if (!vndErr && dbVendors && dbVendors.length > 0) {
+        setVendors(dbVendors.map(v => ({
+          id: v.id,
+          name: v.name,
+          companyName: v.company_name || v.name,
+          phone: v.phone || 'N/A',
+          email: v.email || 'N/A',
+          address: v.city_address || v.address || 'Local',
+          openingBalance: parseFloat(v.opening_balance) || 0,
+          balanceType: v.balance_type || 'Payable',
+          currentBalance: parseFloat(v.current_balance) || 0
+        })));
+      }
+
+      // 4. Fetch Machine Sales
+      const { data: dbSales, error: salesErr } = await supabase.from('machine_sales').select('*').order('created_at', { ascending: false });
+      if (!salesErr && dbSales && dbSales.length > 0) {
+        setMachineSales(dbSales.map(s => ({
+          id: s.id,
+          saleNo: s.sale_no || s.id,
+          customerName: s.customer_name,
+          customerPhone: s.customer_phone || 'N/A',
+          cityAddress: s.city_address || 'Lahore',
+          machineName: s.machine_name,
+          serialNo: s.serial_no,
+          qty: parseFloat(s.qty) || 1,
+          unitPrice: parseFloat(s.unit_price) || 0,
+          discountAmount: parseFloat(s.discount_amount) || 0,
+          lineTotal: parseFloat(s.line_total) || 0,
+          paidAmount: parseFloat(s.paid_amount) || 0,
+          balanceAmount: parseFloat(s.balance_amount) || 0,
+          paymentStatus: s.payment_status || 'Paid',
+          time: s.time || new Date(s.created_at).toLocaleString(),
+          items: s.items || []
+        })));
+      }
+
+      // 5. Fetch Customer Payments
+      const { data: dbCustPay } = await supabase.from('customer_payments').select('*');
+      if (dbCustPay && dbCustPay.length > 0) {
+        setCustomerPayments(dbCustPay.map(cp => ({
+          id: cp.id,
+          customerName: cp.customer_name,
+          date: cp.payment_date,
+          amountPaid: parseFloat(cp.amount_paid) || 0,
+          paymentMethod: cp.payment_method || 'Cash',
+          referenceNo: cp.reference_no,
+          notes: cp.notes
+        })));
+      }
+
+      // 6. Fetch Vendor Payments
+      const { data: dbVndPay } = await supabase.from('vendor_payments').select('*');
+      if (dbVndPay && dbVndPay.length > 0) {
+        setVendorPayments(dbVndPay.map(vp => ({
+          id: vp.id,
+          vendorName: vp.vendor_name,
+          date: vp.payment_date,
+          amountPaid: parseFloat(vp.amount_paid) || 0,
+          paymentMethod: vp.payment_method || 'Cash',
+          referenceNo: vp.reference_no,
+          notes: vp.notes
+        })));
+      }
+
+      // 7. Fetch Categories
+      const { data: dbCategories, error: catErr } = await supabase.from('categories').select('*');
+      if (!catErr && dbCategories && dbCategories.length > 0) {
+        setCategories(dbCategories.map((c) => ({
+          id: c.id,
+          name: c.name,
+          description: c.description
+        })));
+      }
+
+      // 8. Fetch Master Item Names
+      const { data: dbMaster, error: mstErr } = await supabase.from('master_item_names').select('*');
+      if (!mstErr && dbMaster && dbMaster.length > 0) {
+        setMasterItemNames(dbMaster.map((m) => ({
+          id: m.id,
+          name: m.name,
+          category: m.category,
+          defaultUnit: m.default_unit
+        })));
+      }
+    } catch (err) {
+      console.log('Supabase Sync Notice:', err.message);
+    }
+  };
+
+  useEffect(() => {
     fetchSupabaseData();
+
+    // Auto-refetch on window focus for multi-device sync
+    const handleFocus = () => fetchSupabaseData();
+    window.addEventListener('focus', handleFocus);
+
+    // Periodic cloud poll every 20 seconds
+    const interval = setInterval(fetchSupabaseData, 20000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
   }, []);
 
   // ==============================|| ACTIONS ||============================== //
