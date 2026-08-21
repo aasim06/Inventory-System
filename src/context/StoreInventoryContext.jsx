@@ -1224,12 +1224,12 @@ export function StoreInventoryProvider({ children }) {
   );
 
   const todayStockInQty = useMemo(
-    () => todayLogs.filter((log) => log.type && log.type.includes('IN')).reduce((acc, log) => acc + (parseInt(log.qtyUsed) || 0), 0),
+    () => todayLogs.filter((log) => log.type && log.type.toUpperCase().includes('IN')).reduce((acc, log) => acc + (parseInt(log.qtyUsed) || 0), 0),
     [todayLogs]
   );
 
   const todayStockOutQty = useMemo(
-    () => todayLogs.filter((log) => log.type && log.type.includes('OUT')).reduce((acc, log) => acc + (parseInt(log.qtyUsed) || 0), 0),
+    () => todayLogs.filter((log) => log.type && log.type.toUpperCase().includes('OUT')).reduce((acc, log) => acc + (parseInt(log.qtyUsed) || 0), 0),
     [todayLogs]
   );
 

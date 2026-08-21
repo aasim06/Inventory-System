@@ -77,7 +77,7 @@ export default function StockOutPage() {
   // Filter logs for OUT transactions
   const stockOutLogs = usageLogs.filter(
     (log) =>
-      log.type && log.type.includes('OUT') &&
+      log.type && log.type.toUpperCase().includes('OUT') &&
       (log.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (log.usedBy && log.usedBy.toLowerCase().includes(searchTerm.toLowerCase())) ||

@@ -70,7 +70,7 @@ export default function IncomeAreaChart({ view }) {
   const stockOutMonthly = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
   usageLogs.forEach((log) => {
-    const isIN = log.type && log.type.includes('IN');
+    const isIN = log.type && log.type.toUpperCase().includes('IN');
     const qty = parseInt(log.qtyUsed) || 0;
 
     let dayIdx = currentDayIndex;

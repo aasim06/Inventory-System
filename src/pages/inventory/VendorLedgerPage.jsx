@@ -52,7 +52,7 @@ export default function VendorLedgerPage() {
   const [printVendorData, setPrintVendorData] = useState(null);
 
   // Filter Stock In logs
-  const stockInLogs = usageLogs.filter((log) => log.type && log.type.includes('IN'));
+  const stockInLogs = usageLogs.filter((log) => log.type && log.type.toUpperCase().includes('IN'));
 
   // Group Stock In logs by Vendor
   const vendorMap = {};

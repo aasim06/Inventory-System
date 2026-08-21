@@ -245,7 +245,7 @@ export default function StockInPage() {
 
   // Filter logs for IN transactions
   const stockInLogs = usageLogs.filter((log) => {
-    const isIN = log.type && log.type.includes('IN');
+    const isIN = log.type && log.type.toUpperCase().includes('IN');
     const matchesSearch =
       log.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||

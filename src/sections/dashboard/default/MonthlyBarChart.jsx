@@ -16,7 +16,7 @@ export default function MonthlyBarChart() {
   const now = new Date();
   const currentDayIndex = (now.getDay() + 6) % 7; // Mon: 0, Tue: 1 ... Sun: 6
 
-  const stockOutLogs = usageLogs.filter((log) => log.type && log.type.includes('OUT'));
+  const stockOutLogs = usageLogs.filter((log) => log.type && log.type.toUpperCase().includes('OUT'));
 
   stockOutLogs.forEach((log) => {
     let dayIdx = currentDayIndex;

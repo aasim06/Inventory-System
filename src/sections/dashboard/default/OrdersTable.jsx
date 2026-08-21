@@ -202,12 +202,12 @@ export default function OrderTable() {
                     <Typography variant="subtitle2" fontWeight={600}>
                       {row.itemName}
                     </Typography>
-                    <Chip label={row.type} size="small" variant="light" color={row.type.includes('IN') ? 'success' : 'primary'} sx={{ mt: 0.5 }} />
+                    <Chip label={row.type} size="small" variant="light" color={row.type && row.type.toUpperCase().includes('IN') ? 'success' : 'primary'} sx={{ mt: 0.5 }} />
                   </TableCell>
 
                   <TableCell align="center">
-                    <Typography variant="subtitle1" fontWeight={700} color={row.type.includes('IN') ? 'success.main' : 'error.main'}>
-                      {row.type.includes('IN') ? row.qtyUsed : `-${row.qtyUsed}`}
+                    <Typography variant="subtitle1" fontWeight={700} color={row.type && row.type.toUpperCase().includes('IN') ? 'success.main' : 'error.main'}>
+                      {row.type && row.type.toUpperCase().includes('IN') ? row.qtyUsed : `-${row.qtyUsed}`}
                     </Typography>
                   </TableCell>
 

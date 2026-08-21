@@ -242,7 +242,7 @@ export default function UsageLogPage() {
               </TableRow>
             ) : (
               filteredLogs.map((log) => {
-                const isIN = log.type.includes('IN');
+                const isIN = log.type && log.type.toUpperCase().includes('IN');
                 const isLogSelected = isSelected(log.id);
 
                 return (
