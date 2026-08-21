@@ -165,24 +165,23 @@ export function StoreInventoryProvider({ children }) {
           status: parseFloat(i.current_stock) <= 0 ? 2 : parseFloat(i.current_stock) <= (parseFloat(i.min_threshold) || 10) ? 0 : 1
         }));
         setItems(mappedItems);
-      } else {
-        // Fallback check store_items
-        const { data: dbStoreItems } = await supabase.from('store_items').select('*');
-        if (dbStoreItems && dbStoreItems.length > 0) {
-          setItems(dbStoreItems.map(i => ({
+      } else if (!itemsErr && (!dbItems || dbItems.length === 0)) {
+        // AUTO-SEED: Sync local storage items up to Supabase if Supabase is fresh empty!
+        const localItems = safeParseJSON('rehmat_store_items_v2', []);
+        if (localItems && localItems.length > 0) {
+          const itemsToInsert = localItems.map((i) => ({
             id: i.id,
             name: i.name,
-            itemCode: i.item_code || i.id,
+            sku_code: i.itemCode || i.id,
             category: i.category || 'General',
             unit: i.unit || 'PCS',
-            totalStock: parseFloat(i.total_stock) || 0,
-            usedToday: parseFloat(i.used_today) || 0,
-            remainingStock: parseFloat(i.remaining_stock) || 0,
-            unitPrice: parseFloat(i.unit_price) || 0,
-            minLevel: parseFloat(i.min_level) || 10,
-            rackLocation: i.rack_location || 'Main Store',
-            status: i.status || 1
-          })));
+            current_stock: i.remainingStock !== undefined ? i.remainingStock : (i.totalStock || 0),
+            unit_price: i.unitPrice || 0,
+            min_threshold: i.minLevel || 10,
+            location: i.rackLocation || 'Main Store'
+          }));
+          await supabase.from('items').upsert(itemsToInsert);
+          setItems(localItems);
         }
       }
 
@@ -458,24 +457,23 @@ export function StoreInventoryProvider({ children }) {
     setUsageLogs((prev) => [newLog, ...prev]);
 
     try {
-      await supabase.from('store_items').update({
-        used_today: newUsedToday,
-        remaining_stock: newRemainingStock,
-        status: newRemainingStock === 0 ? 2 : isLowStock ? 0 : 1
+      await supabase.from('items').update({
+        current_stock: newRemainingStock
       }).eq('id', targetItem.id);
 
       await supabase.from('usage_logs').insert([{
-        item_code: targetItem.itemCode,
+        id: newLog.id,
+        type: 'Stock Out',
+        item_id: targetItem.id,
         item_name: targetItem.name,
+        item_code: targetItem.itemCode,
         qty_used: actualQty,
+        unit_price: price,
+        line_total: lineTotal,
         used_by: usedBy,
         department,
-        issued_by: issuedBy,
-        type: 'OUT (Daily Usage)',
-        date_iso: now.toISOString(),
-        remaining_stock_after: newRemainingStock,
-        status: 1,
-        notes
+        time: newLog.time,
+        timestamp: now.toISOString()
       }]);
     } catch (e) {
       console.error(e);
@@ -533,24 +531,24 @@ export function StoreInventoryProvider({ children }) {
     setUsageLogs((prev) => [newLog, ...prev]);
 
     try {
-      await supabase.from('store_items').update({
-        total_stock: newTotalStock,
-        remaining_stock: newRemainingStock,
-        status: isLowStock ? 0 : 1
+      await supabase.from('items').update({
+        current_stock: newRemainingStock,
+        unit_price: price > 0 ? price : targetItem.unitPrice
       }).eq('id', targetItem.id);
 
       await supabase.from('usage_logs').insert([{
-        item_code: targetItem.itemCode,
+        id: newLog.id,
+        type: 'Stock In',
+        item_id: targetItem.id,
         item_name: targetItem.name,
+        item_code: targetItem.itemCode,
         qty_used: actualQty,
+        unit_price: price,
+        line_total: lineTotal,
         used_by: supplierName,
         department: 'Store Inward',
-        issued_by: 'Store Manager',
-        type: 'IN (Shipment Received)',
-        date_iso: now.toISOString(),
-        remaining_stock_after: newRemainingStock,
-        status: 1,
-        notes: `Shipment Ref: ${refNo}`
+        time: newLog.time,
+        timestamp: now.toISOString()
       }]);
     } catch (e) {
       console.error(e);
@@ -572,18 +570,16 @@ export function StoreInventoryProvider({ children }) {
     setItems((prev) => [newItem, ...prev]);
 
     try {
-      await supabase.from('store_items').insert([{
-        item_code: newItem.itemCode,
+      await supabase.from('items').upsert([{
+        id: newItem.id,
         name: newItem.name,
-        category: newItem.category,
-        total_stock: newItem.totalStock,
-        used_today: 0,
-        remaining_stock: newItem.totalStock,
-        unit: newItem.unit,
-        unit_price: newItem.unitPrice,
-        min_level: newItem.minLevel,
-        rack_location: newItem.rackLocation,
-        status: 1
+        sku_code: newItem.itemCode,
+        category: newItem.category || 'General',
+        unit: newItem.unit || 'PCS',
+        current_stock: newItem.totalStock || 0,
+        unit_price: newItem.unitPrice || 0,
+        min_threshold: newItem.minLevel || 10,
+        location: newItem.rackLocation || 'Main Store'
       }]);
     } catch (e) {
       console.error(e);
@@ -609,14 +605,14 @@ export function StoreInventoryProvider({ children }) {
     );
 
     try {
-      await supabase.from('store_items').update({
+      await supabase.from('items').update({
         name: updatedData.name,
         category: updatedData.category,
-        total_stock: updatedData.totalStock,
+        current_stock: updatedData.totalStock,
         unit: updatedData.unit,
         unit_price: updatedData.unitPrice,
-        min_level: updatedData.minLevel,
-        rack_location: updatedData.rackLocation
+        min_threshold: updatedData.minLevel,
+        location: updatedData.rackLocation
       }).eq('id', itemId);
     } catch (e) {
       console.error(e);
@@ -628,7 +624,7 @@ export function StoreInventoryProvider({ children }) {
     setItems((prev) => prev.filter((i) => i.id !== itemId));
 
     try {
-      await supabase.from('store_items').delete().eq('id', itemId);
+      await supabase.from('items').delete().eq('id', itemId);
     } catch (e) {
       console.error(e);
     }
@@ -640,7 +636,7 @@ export function StoreInventoryProvider({ children }) {
     setItems((prev) => prev.filter((i) => !idsSet.has(i.id)));
 
     try {
-      await supabase.from('store_items').delete().in('id', itemIds);
+      await supabase.from('items').delete().in('id', itemIds);
     } catch (e) {
       console.error(e);
     }
@@ -662,7 +658,7 @@ export function StoreInventoryProvider({ children }) {
     localStorage.setItem('store_inventory_items', JSON.stringify(cleaned));
 
     try {
-      await supabase.from('store_items').delete().eq('total_stock', 0).eq('unit_price', 0);
+      await supabase.from('items').delete().eq('current_stock', 0).eq('unit_price', 0);
     } catch (e) {
       console.error(e);
     }
