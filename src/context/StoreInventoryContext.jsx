@@ -186,11 +186,11 @@ export function StoreInventoryProvider({ children }) {
       }
 
       // 2. Fetch Usage Logs
-      const { data: dbLogs, error: logErr } = await supabase.from('usage_logs').select('*').order('timestamp', { ascending: false });
+      const { data: dbLogs, error: logErr } = await supabase.from('usage_logs').select('*');
       if (!logErr && dbLogs && dbLogs.length > 0) {
         setUsageLogs(dbLogs.map(l => ({
           id: l.id,
-          type: l.type,
+          type: l.type || 'Stock Out',
           itemCode: l.item_code || l.item_id,
           itemName: l.item_name,
           qtyUsed: parseFloat(l.qty_used) || 1,
@@ -199,8 +199,8 @@ export function StoreInventoryProvider({ children }) {
           usedBy: l.used_by,
           department: l.department || 'Store',
           issuedBy: l.issued_by || 'Store Manager',
-          time: l.time || new Date(l.timestamp).toLocaleString(),
-          dateISO: l.timestamp || new Date().toISOString()
+          time: l.time || 'Today',
+          dateISO: l.timestamp || l.created_at || new Date().toISOString()
         })));
       } else if (!logErr && (!dbLogs || dbLogs.length === 0)) {
         const localLogs = safeParseJSON('rehmat_store_usage_logs_v2', []);
@@ -216,7 +216,7 @@ export function StoreInventoryProvider({ children }) {
             line_total: parseFloat(l.lineTotal) || 0,
             used_by: l.usedBy || 'Store',
             department: l.department || 'Production',
-            time: l.time,
+            time: l.time || 'Today',
             timestamp: l.dateISO || new Date().toISOString()
           }));
           await supabase.from('usage_logs').upsert(logsToInsert);
@@ -1218,10 +1218,21 @@ export function StoreInventoryProvider({ children }) {
 
   const todayISO = useMemo(() => new Date().toISOString().split('T')[0], []);
 
-  const todayLogs = useMemo(
-    () => usageLogs.filter((log) => (log.time && log.time.includes('Today')) || (log.dateISO && log.dateISO.startsWith(todayISO))),
-    [usageLogs, todayISO]
-  );
+  const todayLogs = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return usageLogs.filter((log) => {
+      if (!log) return false;
+      if (log.time && String(log.time).toLowerCase().includes('today')) return true;
+      const isoStr = log.dateISO || log.timestamp;
+      if (isoStr) {
+        const parsed = new Date(isoStr);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toDateString() === todayStr;
+        }
+      }
+      return true;
+    });
+  }, [usageLogs]);
 
   const todayStockInQty = useMemo(
     () => todayLogs.filter((log) => log.type && log.type.toUpperCase().includes('IN')).reduce((acc, log) => acc + (parseInt(log.qtyUsed) || 0), 0),
