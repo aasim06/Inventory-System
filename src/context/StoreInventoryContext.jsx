@@ -202,6 +202,26 @@ export function StoreInventoryProvider({ children }) {
           time: l.time || new Date(l.timestamp).toLocaleString(),
           dateISO: l.timestamp || new Date().toISOString()
         })));
+      } else if (!logErr && (!dbLogs || dbLogs.length === 0)) {
+        const localLogs = safeParseJSON('rehmat_store_usage_logs_v2', []);
+        if (localLogs && localLogs.length > 0) {
+          const logsToInsert = localLogs.map(l => ({
+            id: l.id,
+            type: l.type || 'Stock Out',
+            item_id: l.itemCode || l.id,
+            item_name: l.itemName || 'Item',
+            item_code: l.itemCode,
+            qty_used: parseFloat(l.qtyUsed) || 1,
+            unit_price: parseFloat(l.unitPrice) || 0,
+            line_total: parseFloat(l.lineTotal) || 0,
+            used_by: l.usedBy || 'Store',
+            department: l.department || 'Production',
+            time: l.time,
+            timestamp: l.dateISO || new Date().toISOString()
+          }));
+          await supabase.from('usage_logs').upsert(logsToInsert);
+          setUsageLogs(localLogs);
+        }
       }
 
       // 3. Fetch Vendors
@@ -241,6 +261,29 @@ export function StoreInventoryProvider({ children }) {
           time: s.time || new Date(s.created_at).toLocaleString(),
           items: s.items || []
         })));
+      } else if (!salesErr && (!dbSales || dbSales.length === 0)) {
+        const localSales = safeParseJSON('rehmat_store_machine_sales_v2', []);
+        if (localSales && localSales.length > 0) {
+          const salesToInsert = localSales.map(s => ({
+            id: s.id,
+            sale_no: s.saleNo || s.id,
+            customer_name: s.customerName || 'Customer',
+            customer_phone: s.customerPhone,
+            city_address: s.cityAddress,
+            machine_name: s.machineName,
+            serial_no: s.serialNo,
+            qty: parseFloat(s.qty) || 1,
+            unit_price: parseFloat(s.unitPrice) || 0,
+            discount_amount: parseFloat(s.discountAmount) || 0,
+            line_total: parseFloat(s.lineTotal) || 0,
+            paid_amount: parseFloat(s.paidAmount) || 0,
+            balance_amount: parseFloat(s.balanceAmount) || 0,
+            payment_status: s.paymentStatus || 'Paid',
+            items: s.items || []
+          }));
+          await supabase.from('machine_sales').upsert(salesToInsert);
+          setMachineSales(localSales);
+        }
       }
 
       // 5. Fetch Customer Payments
@@ -828,31 +871,31 @@ export function StoreInventoryProvider({ children }) {
 
     const itemsList = (newSaleData.items && newSaleData.items.length > 0)
       ? newSaleData.items.map((i) => {
-          const q = parseInt(i.qty) || 1;
-          const p = parseFloat(i.unitPrice) || 0;
-          const discPercent = parseFloat(i.discount) || 0;
-          const gross = q * p;
-          const discAmount = (gross * discPercent) / 100;
-          const lineTotal = Math.max(0, gross - discAmount);
-          return {
-            machineName: i.machineName || 'Machine',
-            serialNo: i.serialNo || '',
-            qty: q,
-            unitPrice: p,
-            discount: discPercent,
-            discountAmount: discAmount,
-            lineTotal
-          };
-        })
+        const q = parseInt(i.qty) || 1;
+        const p = parseFloat(i.unitPrice) || 0;
+        const discPercent = parseFloat(i.discount) || 0;
+        const gross = q * p;
+        const discAmount = (gross * discPercent) / 100;
+        const lineTotal = Math.max(0, gross - discAmount);
+        return {
+          machineName: i.machineName || 'Machine',
+          serialNo: i.serialNo || '',
+          qty: q,
+          unitPrice: p,
+          discount: discPercent,
+          discountAmount: discAmount,
+          lineTotal
+        };
+      })
       : [{
-          machineName: newSaleData.machineName || 'Machine',
-          serialNo: newSaleData.serialNo || '',
-          qty: parseInt(newSaleData.qty) || 1,
-          unitPrice: parseFloat(newSaleData.unitPrice) || 0,
-          discount: parseFloat(newSaleData.discount) || 0,
-          discountAmount: (((parseInt(newSaleData.qty) || 1) * (parseFloat(newSaleData.unitPrice) || 0)) * (parseFloat(newSaleData.discount) || 0)) / 100,
-          lineTotal: Math.max(0, ((parseInt(newSaleData.qty) || 1) * (parseFloat(newSaleData.unitPrice) || 0)) - ((((parseInt(newSaleData.qty) || 1) * (parseFloat(newSaleData.unitPrice) || 0)) * (parseFloat(newSaleData.discount) || 0)) / 100))
-        }];
+        machineName: newSaleData.machineName || 'Machine',
+        serialNo: newSaleData.serialNo || '',
+        qty: parseInt(newSaleData.qty) || 1,
+        unitPrice: parseFloat(newSaleData.unitPrice) || 0,
+        discount: parseFloat(newSaleData.discount) || 0,
+        discountAmount: (((parseInt(newSaleData.qty) || 1) * (parseFloat(newSaleData.unitPrice) || 0)) * (parseFloat(newSaleData.discount) || 0)) / 100,
+        lineTotal: Math.max(0, ((parseInt(newSaleData.qty) || 1) * (parseFloat(newSaleData.unitPrice) || 0)) - ((((parseInt(newSaleData.qty) || 1) * (parseFloat(newSaleData.unitPrice) || 0)) * (parseFloat(newSaleData.discount) || 0)) / 100))
+      }];
 
     const subTotalVal = itemsList.reduce((sum, i) => sum + i.lineTotal, 0);
     const discountVal = parseFloat(newSaleData.discountAmount) || 0;
