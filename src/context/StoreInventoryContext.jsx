@@ -462,16 +462,16 @@ export function StoreInventoryProvider({ children }) {
       const { error } = await supabase.from('usage_logs').insert([{
         id: logId,
         type: 'Stock Out',
-        item_id: targetItem.id,
-        item_name: targetItem.name,
-        item_code: targetItem.itemCode,
+        item_code: targetItem.itemCode || 'N/A',
+        item_name: targetItem.name || 'Item',
         qty_used: actualQty,
-        unit_price: price,
-        line_total: lineTotal,
         used_by: usedBy,
-        department,
-        time: newLog.time,
-        timestamp: now.toISOString()
+        department: department || 'Production',
+        issued_by: issuedBy || 'Store Keeper',
+        date_iso: now.toISOString(),
+        remaining_stock_after: newRemainingStock,
+        status: 1,
+        notes: notes || ''
       }]);
       if (error) console.error('usage_logs insert error:', error);
       else await fetchSupabaseData();
@@ -584,16 +584,16 @@ export function StoreInventoryProvider({ children }) {
       const { error } = await supabase.from('usage_logs').insert([{
         id: logId,
         type: 'Stock In',
-        item_id: targetItem.id,
-        item_name: targetItem.name,
-        item_code: targetItem.itemCode,
+        item_code: targetItem.itemCode || 'N/A',
+        item_name: targetItem.name || 'Item',
         qty_used: actualQty,
-        unit_price: price,
-        line_total: lineTotal,
         used_by: supplierName,
         department: 'Store Inward',
-        time: newLog.time,
-        timestamp: now.toISOString()
+        issued_by: 'Store Manager',
+        date_iso: now.toISOString(),
+        remaining_stock_after: newRemainingStock,
+        status: 1,
+        notes: `Shipment Ref: ${refNo}`
       }]);
       if (error) console.error('usage_logs insert error:', error);
       else await fetchSupabaseData();
