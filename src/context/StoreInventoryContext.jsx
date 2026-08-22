@@ -155,13 +155,29 @@ export function StoreInventoryProvider({ children }) {
     localStorage.setItem('rehmat_store_vendor_payments_v2', JSON.stringify(vendorPayments));
   }, [vendorPayments]);
 
-  // Fetch initial data from Supabase for multi-device sync
+  // Parallel Data Fetching via Promise.allSettled for zero-latency initial load
   const fetchSupabaseData = async () => {
     try {
-      // 1. Fetch store_items
-      const { data: dbItems, error: itemsErr } = await supabase.from('store_items').select('*');
-      if (!itemsErr && dbItems) {
-        const mappedItems = dbItems.map((i) => ({
+      const [
+        itemsRes,
+        logsRes,
+        vendorsRes,
+        salesRes,
+        custPayRes,
+        vndPayRes,
+        catRes
+      ] = await Promise.allSettled([
+        supabase.from('store_items').select('*'),
+        supabase.from('usage_logs').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('vendors').select('*'),
+        supabase.from('machine_sales').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('customer_payments').select('*'),
+        supabase.from('vendor_payments').select('*'),
+        supabase.from('categories').select('*')
+      ]);
+
+      if (itemsRes.status === 'fulfilled' && !itemsRes.value.error && itemsRes.value.data) {
+        const mappedItems = itemsRes.value.data.map((i) => ({
           id: i.id,
           name: i.name,
           itemCode: i.item_code || i.id,
@@ -178,10 +194,8 @@ export function StoreInventoryProvider({ children }) {
         setItems(mappedItems);
       }
 
-      // 2. Fetch Usage Logs
-      const { data: dbLogs, error: logErr } = await supabase.from('usage_logs').select('*');
-      if (!logErr && dbLogs) {
-        setUsageLogs(dbLogs.map(l => ({
+      if (logsRes.status === 'fulfilled' && !logsRes.value.error && logsRes.value.data) {
+        setUsageLogs(logsRes.value.data.map(l => ({
           id: l.id,
           type: l.type || 'Stock Out',
           itemCode: l.item_code || 'N/A',
@@ -197,10 +211,8 @@ export function StoreInventoryProvider({ children }) {
         })));
       }
 
-      // 3. Fetch Vendors
-      const { data: dbVendors, error: vndErr } = await supabase.from('vendors').select('*');
-      if (!vndErr && dbVendors) {
-        setVendors(dbVendors.map(v => ({
+      if (vendorsRes.status === 'fulfilled' && !vendorsRes.value.error && vendorsRes.value.data) {
+        setVendors(vendorsRes.value.data.map(v => ({
           id: v.id,
           name: v.name,
           contactPerson: v.contact_person || v.name,
@@ -214,10 +226,8 @@ export function StoreInventoryProvider({ children }) {
         })));
       }
 
-      // 4. Fetch Machine Sales
-      const { data: dbSales, error: salesErr } = await supabase.from('machine_sales').select('*').order('created_at', { ascending: false });
-      if (!salesErr && dbSales) {
-        setMachineSales(dbSales.map(s => ({
+      if (salesRes.status === 'fulfilled' && !salesRes.value.error && salesRes.value.data) {
+        setMachineSales(salesRes.value.data.map(s => ({
           id: s.id,
           saleNo: s.sale_no || s.id,
           customerName: s.customer_name,
@@ -237,10 +247,8 @@ export function StoreInventoryProvider({ children }) {
         })));
       }
 
-      // 5. Fetch Customer Payments
-      const { data: dbCustPay } = await supabase.from('customer_payments').select('*');
-      if (dbCustPay) {
-        setCustomerPayments(dbCustPay.map(cp => ({
+      if (custPayRes.status === 'fulfilled' && custPayRes.value.data) {
+        setCustomerPayments(custPayRes.value.data.map(cp => ({
           id: cp.id,
           customerName: cp.customer_name,
           date: cp.payment_date,
@@ -251,10 +259,8 @@ export function StoreInventoryProvider({ children }) {
         })));
       }
 
-      // 6. Fetch Vendor Payments
-      const { data: dbVndPay } = await supabase.from('vendor_payments').select('*');
-      if (dbVndPay) {
-        setVendorPayments(dbVndPay.map(vp => ({
+      if (vndPayRes.status === 'fulfilled' && vndPayRes.value.data) {
+        setVendorPayments(vndPayRes.value.data.map(vp => ({
           id: vp.id,
           vendorName: vp.vendor_name,
           date: vp.payment_date,
@@ -265,10 +271,8 @@ export function StoreInventoryProvider({ children }) {
         })));
       }
 
-      // 7. Fetch Categories
-      const { data: dbCategories, error: catErr } = await supabase.from('categories').select('*');
-      if (!catErr && dbCategories) {
-        setCategories(dbCategories.map((c) => ({
+      if (catRes.status === 'fulfilled' && !catRes.value.error && catRes.value.data) {
+        setCategories(catRes.value.data.map((c) => ({
           id: c.id,
           name: c.name,
           description: c.description

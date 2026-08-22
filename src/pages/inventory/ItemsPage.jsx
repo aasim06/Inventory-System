@@ -41,6 +41,8 @@ import { PlusOutlined, SearchOutlined, ImportOutlined, ExportOutlined, DeleteOut
 // project imports
 import MainCard from 'components/MainCard';
 
+import { useDebounce } from 'hooks/useDebounce';
+
 const UNIT_OPTIONS = ['PCS', 'KG', 'Liter', 'Meter', 'Set'];
 
 export default function ItemsPage() {
@@ -48,6 +50,7 @@ export default function ItemsPage() {
 
   // Search & Category filter
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   // Pagination State
@@ -106,10 +109,11 @@ export default function ItemsPage() {
   const categoryFilterOptions = ['All', ...new Set(items.map((i) => i.category))];
 
   const filteredItems = items.filter((i) => {
+    const sTerm = (debouncedSearch || '').toLowerCase();
     const matchesSearch =
-      i.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      i.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      i.rackLocation.toLowerCase().includes(searchTerm.toLowerCase());
+      (i.name || '').toLowerCase().includes(sTerm) ||
+      (i.itemCode || '').toLowerCase().includes(sTerm) ||
+      (i.rackLocation || '').toLowerCase().includes(sTerm);
 
     const matchesCategory = selectedCategory === 'All' || i.category === selectedCategory;
 
