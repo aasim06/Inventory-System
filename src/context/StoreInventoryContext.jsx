@@ -940,8 +940,9 @@ export function StoreInventoryProvider({ children }) {
     setMachineSales((prev) => [newEntry, ...prev]);
 
     try {
-      await supabase.from('machine_sales').insert([{
+      await supabase.from('machine_sales').upsert([{
         id: newEntry.id,
+        sale_no: newEntry.saleNo || newEntry.id,
         customer_name: newEntry.customerName,
         customer_phone: newEntry.customerPhone,
         city_address: newEntry.cityAddress,
@@ -949,15 +950,16 @@ export function StoreInventoryProvider({ children }) {
         serial_no: newEntry.serialNo,
         qty: newEntry.qty,
         unit_price: newEntry.unitPrice,
+        discount_amount: newEntry.discountAmount,
         line_total: newEntry.lineTotal,
         paid_amount: newEntry.paidAmount,
         balance_amount: newEntry.balanceAmount,
         payment_status: newEntry.paymentStatus,
-        warranty_terms: newEntry.warrantyTerms,
-        date_iso: newEntry.dateISO
+        time: newEntry.time,
+        items: newEntry.items || []
       }]);
     } catch (e) {
-      console.error(e);
+      console.error('Supabase addMachineSale Error:', e);
     }
     return newEntry;
   };
@@ -978,8 +980,7 @@ export function StoreInventoryProvider({ children }) {
         line_total: updatedData.lineTotal,
         paid_amount: updatedData.paidAmount,
         balance_amount: updatedData.balanceAmount,
-        payment_status: updatedData.paymentStatus,
-        warranty_terms: updatedData.warrantyTerms
+        payment_status: updatedData.paymentStatus
       }).eq('id', id);
     } catch (e) {
       console.error(e);
@@ -989,12 +990,25 @@ export function StoreInventoryProvider({ children }) {
   const addMachineModel = (modelName) => {
     if (!modelName || !modelName.trim()) return;
     const trimmed = modelName.trim();
-    setMachineModels((prev) => {
-      if (prev.some((m) => m.toLowerCase() === trimmed.toLowerCase())) return prev;
-      const updated = [trimmed, ...prev];
-      localStorage.setItem('store_machine_models', JSON.stringify(updated));
-      return updated;
+    if (!machineModels.some((m) => m.toLowerCase() === trimmed.toLowerCase())) {
+      setMachineModels((prev) => [...prev, trimmed]);
+    }
+  };
+
+  const saveMachineRecipe = (recipeObj) => {
+    setMachineRecipes((prev) => {
+      const existingIdx = prev.findIndex((r) => r.modelName.toLowerCase() === recipeObj.modelName.toLowerCase());
+      if (existingIdx >= 0) {
+        const copy = [...prev];
+        copy[existingIdx] = { ...copy[existingIdx], ...recipeObj };
+        return copy;
+      }
+      return [{ id: `BOM-${Date.now()}`, ...recipeObj }, ...prev];
     });
+  };
+
+  const deleteMachineRecipe = (id) => {
+    setMachineRecipes((prev) => prev.filter((r) => r.id !== id));
   };
 
   const deleteMachineSale = async (id) => {
@@ -1019,33 +1033,6 @@ export function StoreInventoryProvider({ children }) {
   // ----------------------------------------------------
   // BOM MACHINE RECIPES & PRODUCTION ASSEMBLY ACTIONS
   // ----------------------------------------------------
-  const saveMachineRecipe = (recipeData) => {
-    const id = recipeData.id || `BOM-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newRecipe = {
-      ...recipeData,
-      id,
-      updatedAt: new Date().toISOString()
-    };
-
-    setMachineRecipes((prev) => {
-      const idx = prev.findIndex((r) => r.id === id || r.modelName.toLowerCase() === recipeData.modelName.toLowerCase());
-      if (idx >= 0) {
-        const updated = [...prev];
-        updated[idx] = newRecipe;
-        return updated;
-      }
-      return [newRecipe, ...prev];
-    });
-
-    // Auto add model to master catalog if new
-    if (recipeData.modelName) {
-      addMachineModel(recipeData.modelName);
-    }
-  };
-
-  const deleteMachineRecipe = (id) => {
-    setMachineRecipes((prev) => prev.filter((r) => r.id !== id));
-  };
 
   // Batch Assemble Machine (Deducts all raw materials based on Recipe)
   const assembleMachine = (modelName, buildQty = 1) => {
@@ -1074,7 +1061,7 @@ export function StoreInventoryProvider({ children }) {
   // ----------------------------------------------------
   // CUSTOMER LEDGER & PAYMENTS ACTIONS
   // ----------------------------------------------------
-  const addCustomerPayment = (paymentData) => {
+  const addCustomerPayment = async (paymentData) => {
     const paymentId = `PAY-${Math.floor(10000 + Math.random() * 90000)}`;
     const now = new Date();
     const formattedTime = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}, ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
@@ -1111,12 +1098,26 @@ export function StoreInventoryProvider({ children }) {
         })
       );
     }
+
+    try {
+      await supabase.from('customer_payments').upsert([{
+        id: newPayment.id,
+        customer_name: newPayment.customerName,
+        payment_date: newPayment.time,
+        amount_paid: newPayment.amountPaid,
+        payment_method: newPayment.paymentMethod,
+        reference_no: newPayment.referenceNo,
+        notes: newPayment.notes
+      }]);
+    } catch (e) {
+      console.error('Supabase addCustomerPayment Error:', e);
+    }
   };
 
   // ----------------------------------------------------
   // VENDOR LEDGER & PAYABLE ACTIONS
   // ----------------------------------------------------
-  const addVendorPayment = (paymentData) => {
+  const addVendorPayment = async (paymentData) => {
     const paymentId = `VPAY-${Math.floor(10000 + Math.random() * 90000)}`;
     const now = new Date();
     const formattedTime = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}, ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
@@ -1133,6 +1134,20 @@ export function StoreInventoryProvider({ children }) {
     };
 
     setVendorPayments((prev) => [newPayment, ...prev]);
+
+    try {
+      await supabase.from('vendor_payments').upsert([{
+        id: newPayment.id,
+        vendor_name: newPayment.vendorName,
+        payment_date: newPayment.time,
+        amount_paid: newPayment.amountPaid,
+        payment_method: newPayment.paymentMethod,
+        reference_no: newPayment.referenceNo,
+        notes: newPayment.notes
+      }]);
+    } catch (e) {
+      console.error('Supabase addVendorPayment Error:', e);
+    }
   };
 
   // ----------------------------------------------------
