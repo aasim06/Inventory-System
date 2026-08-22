@@ -608,10 +608,17 @@ export function StoreInventoryProvider({ children }) {
   const addNewItem = async (newItemData) => {
     const itemId = generateUUID();
     const itemCode = newItemData.itemCode || `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const priceVal = parseFloat(newItemData.unitPrice) || 0;
+    const minLevelVal = parseFloat(newItemData.minLevel) || 10;
+    const rackLocationVal = newItemData.rackLocation || 'Main Store';
+
     const newItem = {
       ...newItemData,
       id: itemId,
       itemCode: itemCode,
+      unitPrice: priceVal,
+      minLevel: minLevelVal,
+      rackLocation: rackLocationVal,
       usedToday: 0,
       totalStock: parseFloat(newItemData.totalStock) || 0,
       remainingStock: parseFloat(newItemData.totalStock) || 0,
@@ -628,7 +635,11 @@ export function StoreInventoryProvider({ children }) {
         unit: newItem.unit || 'PCS',
         total_stock: parseFloat(newItem.totalStock) || 0,
         used_today: 0,
-        remaining_stock: parseFloat(newItem.totalStock) || 0
+        remaining_stock: parseFloat(newItem.totalStock) || 0,
+        unit_price: priceVal,
+        min_level: minLevelVal,
+        rack_location: rackLocationVal,
+        status: 1
       }]);
       if (error) {
         console.error('Supabase store_items insert error:', error);
@@ -638,10 +649,14 @@ export function StoreInventoryProvider({ children }) {
     } catch (e) {
       console.error(e);
     }
+    return newItem;
   };
 
   // 4. Update Item
   const updateItem = async (itemId, updatedData) => {
+    const priceVal = updatedData.unitPrice !== undefined ? parseFloat(updatedData.unitPrice) || 0 : undefined;
+    const minLevelVal = updatedData.minLevel !== undefined ? parseFloat(updatedData.minLevel) || 10 : undefined;
+
     setItems((prev) =>
       prev.map((i) => {
         if (i.id === itemId) {
@@ -659,13 +674,18 @@ export function StoreInventoryProvider({ children }) {
     );
 
     try {
-      await supabase.from('store_items').update({
+      const updatePayload = {
         name: updatedData.name,
         category: updatedData.category,
         total_stock: updatedData.totalStock,
         remaining_stock: updatedData.totalStock,
         unit: updatedData.unit
-      }).eq('id', itemId);
+      };
+      if (priceVal !== undefined) updatePayload.unit_price = priceVal;
+      if (minLevelVal !== undefined) updatePayload.min_level = minLevelVal;
+      if (updatedData.rackLocation) updatePayload.rack_location = updatedData.rackLocation;
+
+      await supabase.from('store_items').update(updatePayload).eq('id', itemId);
       await fetchSupabaseData();
     } catch (e) {
       console.error(e);
