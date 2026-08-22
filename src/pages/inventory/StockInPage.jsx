@@ -101,29 +101,29 @@ export default function StockInPage() {
   };
 
   // Add Quick Item to Table below (triggered when pressing Enter on QTY field)
-  const handleQuickAddToList = () => {
+  const handleQuickAddToList = async () => {
     if (!form.itemName.trim()) return;
 
-    const matchedItem = items.find((i) => i.name.toLowerCase() === form.itemName.toLowerCase());
+    const matchedItem = items.find((i) => i.name.toLowerCase() === form.itemName.trim().toLowerCase());
     const qtyVal = parseInt(form.qty) || 1;
     const priceVal = parseFloat(form.unitPrice) || 0;
     const poCode = `PO-${Math.floor(1000 + Math.random() * 9000)}`;
 
     if (matchedItem) {
-      receiveStock(matchedItem.id, qtyVal, form.vendor, poCode, priceVal);
+      await receiveStock(matchedItem, qtyVal, form.vendor, poCode, priceVal);
     } else {
       const newCode = `RM-${Math.floor(100 + Math.random() * 900)}`;
-      addNewItem({
-        name: form.itemName,
+      const createdItem = await addNewItem({
+        name: form.itemName.trim(),
         itemCode: newCode,
         category: 'General',
         unit: 'PCS',
-        totalStock: qtyVal,
+        totalStock: 0,
         minLevel: 10,
         unitPrice: priceVal,
         rackLocation: 'Main Store'
       });
-      receiveStock(newCode, qtyVal, form.vendor, poCode, priceVal);
+      await receiveStock(createdItem || newCode, qtyVal, form.vendor, poCode, priceVal);
     }
 
     setForm((prev) => ({
@@ -247,8 +247,8 @@ export default function StockInPage() {
   const stockInLogs = usageLogs.filter((log) => {
     const isIN = log.type && log.type.toUpperCase().includes('IN');
     const matchesSearch =
-      log.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.itemName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.itemCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (log.usedBy && log.usedBy.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return isIN && matchesSearch;

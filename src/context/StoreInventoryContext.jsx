@@ -15,6 +15,17 @@ const safeParseJSON = (key, fallback = []) => {
   }
 };
 
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 const initialMasterItemNames = [
   { id: 'MST-1', name: '3HP Electric Motor (3-Phase)', category: 'Electrical & Motors', defaultUnit: 'pcs' },
   { id: 'MST-2', name: 'SKF Ball Bearing 6205-2RS', category: 'Mechanical Parts', defaultUnit: 'pcs' },
@@ -147,7 +158,7 @@ export function StoreInventoryProvider({ children }) {
   // Fetch initial data from Supabase for multi-device sync
   const fetchSupabaseData = async () => {
     try {
-      // 1. Fetch store_items (Target Table: store_items)
+      // 1. Fetch store_items
       const { data: dbItems, error: itemsErr } = await supabase.from('store_items').select('*');
       if (!itemsErr && dbItems) {
         const mappedItems = dbItems.map((i) => ({
@@ -159,10 +170,10 @@ export function StoreInventoryProvider({ children }) {
           totalStock: parseFloat(i.total_stock) || 0,
           usedToday: parseFloat(i.used_today) || 0,
           remainingStock: parseFloat(i.remaining_stock) || 0,
-          unitPrice: 0,
-          minLevel: 10,
-          rackLocation: 'Main Store',
-          status: parseFloat(i.remaining_stock) <= 0 ? 2 : parseFloat(i.remaining_stock) <= 10 ? 0 : 1
+          unitPrice: parseFloat(i.unit_price) || 0,
+          minLevel: parseFloat(i.min_level) || 10,
+          rackLocation: i.rack_location || 'Main Store',
+          status: parseFloat(i.remaining_stock) <= 0 ? 2 : parseFloat(i.remaining_stock) <= (parseFloat(i.min_level) || 10) ? 0 : 1
         }));
         setItems(mappedItems);
       }
@@ -173,16 +184,16 @@ export function StoreInventoryProvider({ children }) {
         setUsageLogs(dbLogs.map(l => ({
           id: l.id,
           type: l.type || 'Stock Out',
-          itemCode: l.item_code || l.item_id,
-          itemName: l.item_name,
+          itemCode: l.item_code || 'N/A',
+          itemName: l.item_name || 'Item',
           qtyUsed: parseFloat(l.qty_used) || 1,
-          unitPrice: parseFloat(l.unit_price) || 0,
-          lineTotal: parseFloat(l.line_total) || 0,
-          usedBy: l.used_by,
+          unitPrice: 0,
+          lineTotal: 0,
+          usedBy: l.used_by || 'Store',
           department: l.department || 'Store',
           issuedBy: l.issued_by || 'Store Manager',
-          time: l.time || 'Today',
-          dateISO: l.timestamp || l.created_at || new Date().toISOString()
+          time: l.date_iso ? new Date(l.date_iso).toLocaleString() : 'Today',
+          dateISO: l.date_iso || l.created_at || new Date().toISOString()
         })));
       }
 
@@ -192,13 +203,14 @@ export function StoreInventoryProvider({ children }) {
         setVendors(dbVendors.map(v => ({
           id: v.id,
           name: v.name,
-          companyName: v.company_name || v.name,
+          contactPerson: v.contact_person || v.name,
+          companyName: v.name,
           phone: v.phone || 'N/A',
           email: v.email || 'N/A',
-          address: v.city_address || v.address || 'Local',
-          openingBalance: parseFloat(v.opening_balance) || 0,
-          balanceType: v.balance_type || 'Payable',
-          currentBalance: parseFloat(v.current_balance) || 0
+          address: v.address || 'Local',
+          suppliedCategory: v.supplied_category || 'General',
+          openingBalance: 0,
+          currentBalance: 0
         })));
       }
 
@@ -420,8 +432,9 @@ export function StoreInventoryProvider({ children }) {
 
     // Record Usage Log Entry
     const now = new Date();
+    const logId = generateUUID();
     const newLog = {
-      id: `USG-${Math.floor(100000 + Math.random() * 900000)}`,
+      id: logId,
       itemCode: targetItem.itemCode,
       itemName: targetItem.name,
       qtyUsed: actualQty,
@@ -446,8 +459,8 @@ export function StoreInventoryProvider({ children }) {
         remaining_stock: newRemainingStock
       }).eq('id', targetItem.id);
 
-      await supabase.from('usage_logs').insert([{
-        id: newLog.id,
+      const { error } = await supabase.from('usage_logs').insert([{
+        id: logId,
         type: 'Stock Out',
         item_id: targetItem.id,
         item_name: targetItem.name,
@@ -460,7 +473,8 @@ export function StoreInventoryProvider({ children }) {
         time: newLog.time,
         timestamp: now.toISOString()
       }]);
-      await fetchSupabaseData();
+      if (error) console.error('usage_logs insert error:', error);
+      else await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -469,37 +483,76 @@ export function StoreInventoryProvider({ children }) {
   };
 
   // 2. Receive Stock / Store IN Action
-  const receiveStock = async (itemId, qtyReceived, supplierName = 'Vendor Shipment', refNo = 'PO-' + Math.floor(1000 + Math.random() * 9000), unitPrice = 0) => {
-    const targetItem = items.find((i) => i.id === itemId || i.itemCode === itemId || i.name.toLowerCase() === (itemId || '').toLowerCase());
-    if (!targetItem) return false;
+  const receiveStock = async (itemIdOrObj, qtyReceivedParam, supplierNameParam = 'Vendor Shipment', refNoParam = '', unitPriceParam = 0) => {
+    let targetItem = null;
+    let itemId = itemIdOrObj;
+    let qtyReceived = qtyReceivedParam;
+    let supplierName = supplierNameParam || 'Vendor Shipment';
+    let refNo = refNoParam || 'PO-' + Math.floor(1000 + Math.random() * 9000);
+    let unitPrice = unitPriceParam;
+
+    if (typeof itemIdOrObj === 'object' && itemIdOrObj !== null) {
+      targetItem = itemIdOrObj;
+      itemId = targetItem.id || targetItem.itemCode || targetItem.name;
+    } else {
+      targetItem = items.find(
+        (i) =>
+          i.id === itemId ||
+          i.itemCode === itemId ||
+          (i.name || '').toLowerCase() === (itemId || '').toLowerCase()
+      );
+    }
+
+    if (!targetItem) {
+      targetItem = {
+        id: generateUUID(),
+        itemCode: typeof itemId === 'string' ? itemId : `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`,
+        name: typeof itemId === 'string' ? itemId : 'Item',
+        totalStock: 0,
+        remainingStock: 0,
+        minLevel: 10,
+        unitPrice: parseFloat(unitPrice) || 0
+      };
+    }
 
     const actualQty = Math.abs(parseInt(qtyReceived) || 1);
-    const price = parseFloat(unitPrice) || targetItem.unitPrice || 0;
+    const price = parseFloat(unitPrice) > 0 ? parseFloat(unitPrice) : (targetItem.unitPrice || 0);
     const lineTotal = actualQty * price;
-    const newTotalStock = targetItem.totalStock + actualQty;
-    const newRemainingStock = targetItem.remainingStock + actualQty;
-    const isLowStock = newRemainingStock <= targetItem.minLevel;
+    const newTotalStock = (targetItem.totalStock || 0) + actualQty;
+    const newRemainingStock = (targetItem.remainingStock || 0) + actualQty;
+    const isLowStock = newRemainingStock <= (targetItem.minLevel || 10);
 
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id === targetItem.id) {
-          return {
-            ...item,
-            totalStock: newTotalStock,
-            remainingStock: newRemainingStock,
-            unitPrice: price > 0 ? price : item.unitPrice,
-            status: isLowStock ? 0 : 1
-          };
-        }
-        return item;
-      })
-    );
+    setItems((prev) => {
+      const exists = prev.some((i) => i.id === targetItem.id);
+      if (exists) {
+        return prev.map((item) => {
+          if (item.id === targetItem.id) {
+            return {
+              ...item,
+              totalStock: newTotalStock,
+              remainingStock: newRemainingStock,
+              unitPrice: price > 0 ? price : item.unitPrice,
+              status: isLowStock ? 0 : 1
+            };
+          }
+          return item;
+        });
+      }
+      return [{
+        ...targetItem,
+        totalStock: newTotalStock,
+        remainingStock: newRemainingStock,
+        unitPrice: price > 0 ? price : targetItem.unitPrice,
+        status: isLowStock ? 0 : 1
+      }, ...prev];
+    });
 
     const now = new Date();
+    const logId = generateUUID();
     const newLog = {
-      id: `IN-${Math.floor(100000 + Math.random() * 900000)}`,
-      itemCode: targetItem.itemCode,
-      itemName: targetItem.name,
+      id: logId,
+      itemCode: targetItem.itemCode || 'N/A',
+      itemName: targetItem.name || 'Item',
       qtyUsed: actualQty,
       unitPrice: price,
       lineTotal: lineTotal,
@@ -517,13 +570,19 @@ export function StoreInventoryProvider({ children }) {
     setUsageLogs((prev) => [newLog, ...prev]);
 
     try {
-      await supabase.from('store_items').update({
+      await supabase.from('store_items').upsert([{
+        id: targetItem.id,
+        name: targetItem.name,
+        item_code: targetItem.itemCode,
+        category: targetItem.category || 'General',
+        unit: targetItem.unit || 'PCS',
         total_stock: newTotalStock,
+        used_today: targetItem.usedToday || 0,
         remaining_stock: newRemainingStock
-      }).eq('id', targetItem.id);
+      }]);
 
-      await supabase.from('usage_logs').insert([{
-        id: newLog.id,
+      const { error } = await supabase.from('usage_logs').insert([{
+        id: logId,
         type: 'Stock In',
         item_id: targetItem.id,
         item_name: targetItem.name,
@@ -536,9 +595,10 @@ export function StoreInventoryProvider({ children }) {
         time: newLog.time,
         timestamp: now.toISOString()
       }]);
-      await fetchSupabaseData();
+      if (error) console.error('usage_logs insert error:', error);
+      else await fetchSupabaseData();
     } catch (e) {
-      console.error(e);
+      console.error('receiveStock exception:', e);
     }
 
     return true;
@@ -546,28 +606,35 @@ export function StoreInventoryProvider({ children }) {
 
   // 3. Add New Inventory Item to Store
   const addNewItem = async (newItemData) => {
+    const itemId = generateUUID();
+    const itemCode = newItemData.itemCode || `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`;
     const newItem = {
       ...newItemData,
-      id: `INV-${Date.now().toString().slice(-4)}`,
-      itemCode: newItemData.itemCode || `SKU-${Math.floor(10000000 + Math.random() * 90000000)}`,
+      id: itemId,
+      itemCode: itemCode,
       usedToday: 0,
-      remainingStock: newItemData.totalStock,
+      totalStock: parseFloat(newItemData.totalStock) || 0,
+      remainingStock: parseFloat(newItemData.totalStock) || 0,
       status: 1
     };
     setItems((prev) => [newItem, ...prev]);
 
     try {
-      await supabase.from('store_items').upsert([{
-        id: newItem.id,
+      const { error } = await supabase.from('store_items').upsert([{
+        id: itemId,
         name: newItem.name,
-        item_code: newItem.itemCode,
+        item_code: itemCode,
         category: newItem.category || 'General',
         unit: newItem.unit || 'PCS',
-        total_stock: newItem.totalStock || 0,
+        total_stock: parseFloat(newItem.totalStock) || 0,
         used_today: 0,
-        remaining_stock: newItem.totalStock || 0
+        remaining_stock: parseFloat(newItem.totalStock) || 0
       }]);
-      await fetchSupabaseData();
+      if (error) {
+        console.error('Supabase store_items insert error:', error);
+      } else {
+        await fetchSupabaseData();
+      }
     } catch (e) {
       console.error(e);
     }
@@ -654,23 +721,27 @@ export function StoreInventoryProvider({ children }) {
 
   // 6. Vendor Actions
   const addVendor = async (vendorData) => {
+    const vendorId = generateUUID();
     const newVendor = {
       ...vendorData,
-      id: `VND-${Math.floor(10 + Math.random() * 90)}`
+      id: vendorId
     };
     setVendors((prev) => [newVendor, ...prev]);
 
     try {
-      await supabase.from('vendors').insert([{
-        name: vendorData.name,
-        contact_person: vendorData.contactPerson,
-        phone: vendorData.phone,
-        email: vendorData.email,
-        address: vendorData.address,
-        supplied_category: vendorData.suppliedCategory,
+      const { error } = await supabase.from('vendors').insert([{
+        id: vendorId,
+        name: vendorData.name || 'Vendor',
+        contact_person: vendorData.contactPerson || vendorData.name,
+        phone: vendorData.phone || 'N/A',
+        email: vendorData.email || 'N/A',
+        address: vendorData.address || 'Local',
+        supplied_category: vendorData.suppliedCategory || 'General',
         status: 1,
         rating: 5.0
       }]);
+      if (error) console.error('Supabase addVendor error:', error);
+      else await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -682,14 +753,16 @@ export function StoreInventoryProvider({ children }) {
     );
 
     try {
-      await supabase.from('vendors').update({
+      const { error } = await supabase.from('vendors').update({
         name: updatedData.name,
-        contact_person: updatedData.contactPerson,
+        contact_person: updatedData.contactPerson || updatedData.name,
         phone: updatedData.phone,
         email: updatedData.email,
         address: updatedData.address,
         supplied_category: updatedData.suppliedCategory
       }).eq('id', vendorId);
+      if (error) console.error('Supabase updateVendor error:', error);
+      else await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -700,6 +773,7 @@ export function StoreInventoryProvider({ children }) {
 
     try {
       await supabase.from('vendors').delete().eq('id', vendorId);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -712,6 +786,7 @@ export function StoreInventoryProvider({ children }) {
 
     try {
       await supabase.from('vendors').delete().in('id', vendorIds);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -724,6 +799,7 @@ export function StoreInventoryProvider({ children }) {
 
     try {
       await supabase.from('usage_logs').delete().in('id', logIds);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -731,18 +807,22 @@ export function StoreInventoryProvider({ children }) {
 
   // 8. Category Actions
   const addCategory = async (categoryData) => {
+    const categoryId = generateUUID();
     const newCategory = {
-      id: `CAT-${Math.floor(100 + Math.random() * 900)}`,
+      id: categoryId,
       name: categoryData.name,
       description: categoryData.description || ''
     };
     setCategories((prev) => [newCategory, ...prev]);
 
     try {
-      await supabase.from('categories').insert([{
+      const { error } = await supabase.from('categories').insert([{
+        id: categoryId,
         name: categoryData.name,
         description: categoryData.description || ''
       }]);
+      if (error) console.error('Supabase addCategory error:', error);
+      else await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -758,6 +838,7 @@ export function StoreInventoryProvider({ children }) {
         name: updatedData.name,
         description: updatedData.description || ''
       }).eq('id', categoryId);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -768,6 +849,7 @@ export function StoreInventoryProvider({ children }) {
 
     try {
       await supabase.from('categories').delete().eq('id', categoryId);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -779,6 +861,7 @@ export function StoreInventoryProvider({ children }) {
 
     try {
       await supabase.from('categories').delete().in('id', categoryIds);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -789,6 +872,7 @@ export function StoreInventoryProvider({ children }) {
     setUsageLogs((prev) => prev.filter((l) => l.id !== logId));
     try {
       await supabase.from('usage_logs').delete().eq('id', logId);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -804,6 +888,7 @@ export function StoreInventoryProvider({ children }) {
         used_by: updatedData.usedBy,
         qty_used: updatedData.qtyUsed
       }).eq('id', logId);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -812,7 +897,8 @@ export function StoreInventoryProvider({ children }) {
   // Machine Sales Actions
   const addMachineSale = async (newSaleData) => {
     const now = new Date();
-    const id = newSaleData.id || `MS-${Math.floor(10000 + Math.random() * 90000)}`;
+    const saleId = (newSaleData.id && newSaleData.id.includes('-') && newSaleData.id.length > 20) ? newSaleData.id : generateUUID();
+    const saleNo = `MS-${Math.floor(10000 + Math.random() * 90000)}`;
 
     const itemsList = (newSaleData.items && newSaleData.items.length > 0)
       ? newSaleData.items.map((i) => {
@@ -849,7 +935,6 @@ export function StoreInventoryProvider({ children }) {
     const paidVal = parseFloat(newSaleData.paidAmount) || 0;
     const balanceVal = Math.max(0, netTotalVal - paidVal);
 
-    // Auto-register machine names to Master Catalog if new
     itemsList.forEach((i) => {
       if (i.machineName && i.machineName.trim()) {
         addMachineModel(i.machineName);
@@ -862,7 +947,8 @@ export function StoreInventoryProvider({ children }) {
     const firstMachine = itemsList[0] || {};
 
     const newEntry = {
-      id,
+      id: saleId,
+      saleNo: saleNo,
       customerName: newSaleData.customerName || 'Customer',
       customerPhone: newSaleData.customerPhone || '',
       cityAddress: newSaleData.cityAddress || '',
@@ -885,9 +971,9 @@ export function StoreInventoryProvider({ children }) {
     setMachineSales((prev) => [newEntry, ...prev]);
 
     try {
-      await supabase.from('machine_sales').upsert([{
-        id: newEntry.id,
-        sale_no: newEntry.saleNo || newEntry.id,
+      const { error } = await supabase.from('machine_sales').upsert([{
+        id: saleId,
+        sale_no: saleNo,
         customer_name: newEntry.customerName,
         customer_phone: newEntry.customerPhone,
         city_address: newEntry.cityAddress,
@@ -903,8 +989,10 @@ export function StoreInventoryProvider({ children }) {
         time: newEntry.time,
         items: newEntry.items || []
       }]);
+      if (error) console.error('Supabase addMachineSale Error:', error);
+      else await fetchSupabaseData();
     } catch (e) {
-      console.error('Supabase addMachineSale Error:', e);
+      console.error('Supabase addMachineSale Exception:', e);
     }
     return newEntry;
   };
@@ -927,6 +1015,7 @@ export function StoreInventoryProvider({ children }) {
         balance_amount: updatedData.balanceAmount,
         payment_status: updatedData.paymentStatus
       }).eq('id', id);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -948,7 +1037,7 @@ export function StoreInventoryProvider({ children }) {
         copy[existingIdx] = { ...copy[existingIdx], ...recipeObj };
         return copy;
       }
-      return [{ id: `BOM-${Date.now()}`, ...recipeObj }, ...prev];
+      return [{ id: generateUUID(), ...recipeObj }, ...prev];
     });
   };
 
@@ -960,6 +1049,7 @@ export function StoreInventoryProvider({ children }) {
     setMachineSales((prev) => prev.filter((m) => m.id !== id));
     try {
       await supabase.from('machine_sales').delete().eq('id', id);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -970,6 +1060,7 @@ export function StoreInventoryProvider({ children }) {
     setMachineSales((prev) => prev.filter((m) => !idsSet.has(m.id)));
     try {
       await supabase.from('machine_sales').delete().in('id', ids);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -1007,7 +1098,7 @@ export function StoreInventoryProvider({ children }) {
   // CUSTOMER LEDGER & PAYMENTS ACTIONS
   // ----------------------------------------------------
   const addCustomerPayment = async (paymentData) => {
-    const paymentId = `PAY-${Math.floor(10000 + Math.random() * 90000)}`;
+    const paymentId = generateUUID();
     const now = new Date();
     const formattedTime = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}, ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
 
@@ -1045,8 +1136,8 @@ export function StoreInventoryProvider({ children }) {
     }
 
     try {
-      await supabase.from('customer_payments').upsert([{
-        id: newPayment.id,
+      const { error } = await supabase.from('customer_payments').upsert([{
+        id: paymentId,
         customer_name: newPayment.customerName,
         payment_date: newPayment.time,
         amount_paid: newPayment.amountPaid,
@@ -1054,8 +1145,10 @@ export function StoreInventoryProvider({ children }) {
         reference_no: newPayment.referenceNo,
         notes: newPayment.notes
       }]);
+      if (error) console.error('Supabase addCustomerPayment Error:', error);
+      else await fetchSupabaseData();
     } catch (e) {
-      console.error('Supabase addCustomerPayment Error:', e);
+      console.error('Supabase addCustomerPayment Exception:', e);
     }
   };
 
@@ -1063,7 +1156,7 @@ export function StoreInventoryProvider({ children }) {
   // VENDOR LEDGER & PAYABLE ACTIONS
   // ----------------------------------------------------
   const addVendorPayment = async (paymentData) => {
-    const paymentId = `VPAY-${Math.floor(10000 + Math.random() * 90000)}`;
+    const paymentId = generateUUID();
     const now = new Date();
     const formattedTime = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}, ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
 
@@ -1081,8 +1174,8 @@ export function StoreInventoryProvider({ children }) {
     setVendorPayments((prev) => [newPayment, ...prev]);
 
     try {
-      await supabase.from('vendor_payments').upsert([{
-        id: newPayment.id,
+      const { error } = await supabase.from('vendor_payments').upsert([{
+        id: paymentId,
         vendor_name: newPayment.vendorName,
         payment_date: newPayment.time,
         amount_paid: newPayment.amountPaid,
@@ -1090,8 +1183,10 @@ export function StoreInventoryProvider({ children }) {
         reference_no: newPayment.referenceNo,
         notes: newPayment.notes
       }]);
+      if (error) console.error('Supabase addVendorPayment Error:', error);
+      else await fetchSupabaseData();
     } catch (e) {
-      console.error('Supabase addVendorPayment Error:', e);
+      console.error('Supabase addVendorPayment Exception:', e);
     }
   };
 
