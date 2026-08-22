@@ -147,47 +147,29 @@ export function StoreInventoryProvider({ children }) {
   // Fetch initial data from Supabase for multi-device sync
   const fetchSupabaseData = async () => {
     try {
-      // 1. Fetch Items
-      const { data: dbItems, error: itemsErr } = await supabase.from('items').select('*');
-      if (!itemsErr && dbItems && dbItems.length > 0) {
+      // 1. Fetch store_items (Target Table: store_items)
+      const { data: dbItems, error: itemsErr } = await supabase.from('store_items').select('*');
+      if (!itemsErr && dbItems) {
         const mappedItems = dbItems.map((i) => ({
           id: i.id,
           name: i.name,
-          itemCode: i.sku_code || i.id,
+          itemCode: i.item_code || i.id,
           category: i.category || 'General',
           unit: i.unit || 'PCS',
-          totalStock: parseFloat(i.current_stock) || 0,
-          usedToday: 0,
-          remainingStock: parseFloat(i.current_stock) || 0,
-          unitPrice: parseFloat(i.unit_price) || 0,
-          minLevel: parseFloat(i.min_threshold) || 10,
-          rackLocation: i.location || 'Main Store',
-          status: parseFloat(i.current_stock) <= 0 ? 2 : parseFloat(i.current_stock) <= (parseFloat(i.min_threshold) || 10) ? 0 : 1
+          totalStock: parseFloat(i.total_stock) || 0,
+          usedToday: parseFloat(i.used_today) || 0,
+          remainingStock: parseFloat(i.remaining_stock) || 0,
+          unitPrice: 0,
+          minLevel: 10,
+          rackLocation: 'Main Store',
+          status: parseFloat(i.remaining_stock) <= 0 ? 2 : parseFloat(i.remaining_stock) <= 10 ? 0 : 1
         }));
         setItems(mappedItems);
-      } else if (!itemsErr && (!dbItems || dbItems.length === 0)) {
-        // AUTO-SEED: Sync local storage items up to Supabase if Supabase is fresh empty!
-        const localItems = safeParseJSON('rehmat_store_items_v2', []);
-        if (localItems && localItems.length > 0) {
-          const itemsToInsert = localItems.map((i) => ({
-            id: i.id,
-            name: i.name,
-            sku_code: i.itemCode || i.id,
-            category: i.category || 'General',
-            unit: i.unit || 'PCS',
-            current_stock: i.remainingStock !== undefined ? i.remainingStock : (i.totalStock || 0),
-            unit_price: i.unitPrice || 0,
-            min_threshold: i.minLevel || 10,
-            location: i.rackLocation || 'Main Store'
-          }));
-          await supabase.from('items').upsert(itemsToInsert);
-          setItems(localItems);
-        }
       }
 
       // 2. Fetch Usage Logs
       const { data: dbLogs, error: logErr } = await supabase.from('usage_logs').select('*');
-      if (!logErr && dbLogs && dbLogs.length > 0) {
+      if (!logErr && dbLogs) {
         setUsageLogs(dbLogs.map(l => ({
           id: l.id,
           type: l.type || 'Stock Out',
@@ -202,31 +184,11 @@ export function StoreInventoryProvider({ children }) {
           time: l.time || 'Today',
           dateISO: l.timestamp || l.created_at || new Date().toISOString()
         })));
-      } else if (!logErr && (!dbLogs || dbLogs.length === 0)) {
-        const localLogs = safeParseJSON('rehmat_store_usage_logs_v2', []);
-        if (localLogs && localLogs.length > 0) {
-          const logsToInsert = localLogs.map(l => ({
-            id: l.id,
-            type: l.type || 'Stock Out',
-            item_id: l.itemCode || l.id,
-            item_name: l.itemName || 'Item',
-            item_code: l.itemCode,
-            qty_used: parseFloat(l.qtyUsed) || 1,
-            unit_price: parseFloat(l.unitPrice) || 0,
-            line_total: parseFloat(l.lineTotal) || 0,
-            used_by: l.usedBy || 'Store',
-            department: l.department || 'Production',
-            time: l.time || 'Today',
-            timestamp: l.dateISO || new Date().toISOString()
-          }));
-          await supabase.from('usage_logs').upsert(logsToInsert);
-          setUsageLogs(localLogs);
-        }
       }
 
       // 3. Fetch Vendors
       const { data: dbVendors, error: vndErr } = await supabase.from('vendors').select('*');
-      if (!vndErr && dbVendors && dbVendors.length > 0) {
+      if (!vndErr && dbVendors) {
         setVendors(dbVendors.map(v => ({
           id: v.id,
           name: v.name,
@@ -242,7 +204,7 @@ export function StoreInventoryProvider({ children }) {
 
       // 4. Fetch Machine Sales
       const { data: dbSales, error: salesErr } = await supabase.from('machine_sales').select('*').order('created_at', { ascending: false });
-      if (!salesErr && dbSales && dbSales.length > 0) {
+      if (!salesErr && dbSales) {
         setMachineSales(dbSales.map(s => ({
           id: s.id,
           saleNo: s.sale_no || s.id,
@@ -261,34 +223,11 @@ export function StoreInventoryProvider({ children }) {
           time: s.time || new Date(s.created_at).toLocaleString(),
           items: s.items || []
         })));
-      } else if (!salesErr && (!dbSales || dbSales.length === 0)) {
-        const localSales = safeParseJSON('rehmat_store_machine_sales_v2', []);
-        if (localSales && localSales.length > 0) {
-          const salesToInsert = localSales.map(s => ({
-            id: s.id,
-            sale_no: s.saleNo || s.id,
-            customer_name: s.customerName || 'Customer',
-            customer_phone: s.customerPhone,
-            city_address: s.cityAddress,
-            machine_name: s.machineName,
-            serial_no: s.serialNo,
-            qty: parseFloat(s.qty) || 1,
-            unit_price: parseFloat(s.unitPrice) || 0,
-            discount_amount: parseFloat(s.discountAmount) || 0,
-            line_total: parseFloat(s.lineTotal) || 0,
-            paid_amount: parseFloat(s.paidAmount) || 0,
-            balance_amount: parseFloat(s.balanceAmount) || 0,
-            payment_status: s.paymentStatus || 'Paid',
-            items: s.items || []
-          }));
-          await supabase.from('machine_sales').upsert(salesToInsert);
-          setMachineSales(localSales);
-        }
       }
 
       // 5. Fetch Customer Payments
       const { data: dbCustPay } = await supabase.from('customer_payments').select('*');
-      if (dbCustPay && dbCustPay.length > 0) {
+      if (dbCustPay) {
         setCustomerPayments(dbCustPay.map(cp => ({
           id: cp.id,
           customerName: cp.customer_name,
@@ -302,7 +241,7 @@ export function StoreInventoryProvider({ children }) {
 
       // 6. Fetch Vendor Payments
       const { data: dbVndPay } = await supabase.from('vendor_payments').select('*');
-      if (dbVndPay && dbVndPay.length > 0) {
+      if (dbVndPay) {
         setVendorPayments(dbVndPay.map(vp => ({
           id: vp.id,
           vendorName: vp.vendor_name,
@@ -316,22 +255,11 @@ export function StoreInventoryProvider({ children }) {
 
       // 7. Fetch Categories
       const { data: dbCategories, error: catErr } = await supabase.from('categories').select('*');
-      if (!catErr && dbCategories && dbCategories.length > 0) {
+      if (!catErr && dbCategories) {
         setCategories(dbCategories.map((c) => ({
           id: c.id,
           name: c.name,
           description: c.description
-        })));
-      }
-
-      // 8. Fetch Master Item Names
-      const { data: dbMaster, error: mstErr } = await supabase.from('master_item_names').select('*');
-      if (!mstErr && dbMaster && dbMaster.length > 0) {
-        setMasterItemNames(dbMaster.map((m) => ({
-          id: m.id,
-          name: m.name,
-          category: m.category,
-          defaultUnit: m.default_unit
         })));
       }
     } catch (err) {
@@ -513,8 +441,9 @@ export function StoreInventoryProvider({ children }) {
     setUsageLogs((prev) => [newLog, ...prev]);
 
     try {
-      await supabase.from('items').update({
-        current_stock: newRemainingStock
+      await supabase.from('store_items').update({
+        used_today: newUsedToday,
+        remaining_stock: newRemainingStock
       }).eq('id', targetItem.id);
 
       await supabase.from('usage_logs').insert([{
@@ -531,6 +460,7 @@ export function StoreInventoryProvider({ children }) {
         time: newLog.time,
         timestamp: now.toISOString()
       }]);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -587,9 +517,9 @@ export function StoreInventoryProvider({ children }) {
     setUsageLogs((prev) => [newLog, ...prev]);
 
     try {
-      await supabase.from('items').update({
-        current_stock: newRemainingStock,
-        unit_price: price > 0 ? price : targetItem.unitPrice
+      await supabase.from('store_items').update({
+        total_stock: newTotalStock,
+        remaining_stock: newRemainingStock
       }).eq('id', targetItem.id);
 
       await supabase.from('usage_logs').insert([{
@@ -606,6 +536,7 @@ export function StoreInventoryProvider({ children }) {
         time: newLog.time,
         timestamp: now.toISOString()
       }]);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -626,17 +557,17 @@ export function StoreInventoryProvider({ children }) {
     setItems((prev) => [newItem, ...prev]);
 
     try {
-      await supabase.from('items').upsert([{
+      await supabase.from('store_items').upsert([{
         id: newItem.id,
         name: newItem.name,
-        sku_code: newItem.itemCode,
+        item_code: newItem.itemCode,
         category: newItem.category || 'General',
         unit: newItem.unit || 'PCS',
-        current_stock: newItem.totalStock || 0,
-        unit_price: newItem.unitPrice || 0,
-        min_threshold: newItem.minLevel || 10,
-        location: newItem.rackLocation || 'Main Store'
+        total_stock: newItem.totalStock || 0,
+        used_today: 0,
+        remaining_stock: newItem.totalStock || 0
       }]);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -661,15 +592,14 @@ export function StoreInventoryProvider({ children }) {
     );
 
     try {
-      await supabase.from('items').update({
+      await supabase.from('store_items').update({
         name: updatedData.name,
         category: updatedData.category,
-        current_stock: updatedData.totalStock,
-        unit: updatedData.unit,
-        unit_price: updatedData.unitPrice,
-        min_threshold: updatedData.minLevel,
-        location: updatedData.rackLocation
+        total_stock: updatedData.totalStock,
+        remaining_stock: updatedData.totalStock,
+        unit: updatedData.unit
       }).eq('id', itemId);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -680,7 +610,8 @@ export function StoreInventoryProvider({ children }) {
     setItems((prev) => prev.filter((i) => i.id !== itemId));
 
     try {
-      await supabase.from('items').delete().eq('id', itemId);
+      await supabase.from('store_items').delete().eq('id', itemId);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -692,7 +623,8 @@ export function StoreInventoryProvider({ children }) {
     setItems((prev) => prev.filter((i) => !idsSet.has(i.id)));
 
     try {
-      await supabase.from('items').delete().in('id', itemIds);
+      await supabase.from('store_items').delete().in('id', itemIds);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -702,7 +634,7 @@ export function StoreInventoryProvider({ children }) {
   const cleanDuplicateItems = async () => {
     const seen = new Set();
     const cleaned = items.filter((item) => {
-      if (item.totalStock === 0 && item.unitPrice === 0 && item.remainingStock === 0) {
+      if (item.totalStock === 0 && item.remainingStock === 0) {
         const key = `${(item.name || '').toLowerCase()}_zero`;
         if (seen.has(key)) return false;
         seen.add(key);
@@ -711,10 +643,10 @@ export function StoreInventoryProvider({ children }) {
     });
 
     setItems(cleaned);
-    localStorage.setItem('store_inventory_items', JSON.stringify(cleaned));
 
     try {
-      await supabase.from('items').delete().eq('current_stock', 0).eq('unit_price', 0);
+      await supabase.from('store_items').delete().eq('remaining_stock', 0);
+      await fetchSupabaseData();
     } catch (e) {
       console.error(e);
     }
@@ -1192,15 +1124,14 @@ export function StoreInventoryProvider({ children }) {
         const itemsToInsert = data.items.map((i) => ({
           id: i.id,
           name: i.name,
-          sku_code: i.itemCode || i.id,
+          item_code: i.itemCode || i.id,
           category: i.category || 'General',
           unit: i.unit || 'PCS',
-          current_stock: i.remainingStock !== undefined ? i.remainingStock : (i.totalStock || 0),
-          unit_price: i.unitPrice || 0,
-          min_threshold: i.minLevel || 10,
-          location: i.rackLocation || 'Main Store'
+          total_stock: i.totalStock || 0,
+          used_today: i.usedToday || 0,
+          remaining_stock: i.remainingStock !== undefined ? i.remainingStock : (i.totalStock || 0)
         }));
-        await supabase.from('items').upsert(itemsToInsert);
+        await supabase.from('store_items').upsert(itemsToInsert);
       }
       if (data.usageLogs && Array.isArray(data.usageLogs)) {
         setUsageLogs(data.usageLogs);
@@ -1244,9 +1175,6 @@ export function StoreInventoryProvider({ children }) {
       }
       if (data.vendors && Array.isArray(data.vendors)) setVendors(data.vendors);
       if (data.categories && Array.isArray(data.categories)) setCategories(data.categories);
-      if (data.masterItemNames && Array.isArray(data.masterItemNames)) setMasterItemNames(data.masterItemNames);
-      if (data.machineModels && Array.isArray(data.machineModels)) setMachineModels(data.machineModels);
-      if (data.machineRecipes && Array.isArray(data.machineRecipes)) setMachineRecipes(data.machineRecipes);
 
       await fetchSupabaseData();
       return { success: true, message: 'All Store Data Successfully Restored to Cloud Database!' };
@@ -1258,42 +1186,30 @@ export function StoreInventoryProvider({ children }) {
 
   const resetAllDataToZero = async () => {
     try {
-      // 1. Wipe all operational tables in Supabase Cloud Database
+      // 1. Wipe store_items, usage_logs, and all operational tables from Supabase Database
       await Promise.allSettled([
-        supabase.from('items').delete().neq('id', '00000_SYSTEM_WIPE'),
-        supabase.from('usage_logs').delete().neq('id', '00000_SYSTEM_WIPE'),
-        supabase.from('vendors').delete().neq('id', '00000_SYSTEM_WIPE'),
-        supabase.from('machine_sales').delete().neq('id', '00000_SYSTEM_WIPE'),
-        supabase.from('customer_payments').delete().neq('id', '00000_SYSTEM_WIPE'),
-        supabase.from('vendor_payments').delete().neq('id', '00000_SYSTEM_WIPE'),
-        supabase.from('categories').delete().neq('id', '00000_SYSTEM_WIPE')
+        supabase.from('store_items').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('usage_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('machine_sales').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('customer_payments').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('vendor_payments').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('vendors').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       ]);
 
       // 2. Clear all local browser storage
-      const keysToRemove = [
-        'store_inventory_items',
-        'store_usage_logs',
-        'store_vendors',
-        'store_machine_sales',
-        'store_customer_payments',
-        'store_vendor_payments',
-        'rehmat_store_items_v2',
-        'rehmat_store_usage_logs_v2',
-        'rehmat_store_vendors_v2',
-        'rehmat_store_machine_sales_v2',
-        'rehmat_store_customer_payments_v2',
-        'rehmat_store_vendor_payments_v2'
-      ];
-      keysToRemove.forEach((key) => localStorage.removeItem(key));
+      localStorage.clear();
       sessionStorage.clear();
 
-      // 3. Clear UI State
+      // 3. Clear UI State immediately
       setItems([]);
       setUsageLogs([]);
       setVendors([]);
       setMachineSales([]);
       setCustomerPayments([]);
       setVendorPayments([]);
+
+      // 4. Refetch live state from Supabase immediately so the UI reflects an empty state across all browsers
+      await fetchSupabaseData();
 
       return { success: true, message: 'All Cloud Database records & Local Storage wiped successfully to 0!' };
     } catch (err) {
