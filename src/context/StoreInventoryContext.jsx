@@ -346,12 +346,25 @@ export function StoreInventoryProvider({ children }) {
     const handleFocus = () => fetchSupabaseData();
     window.addEventListener('focus', handleFocus);
 
-    // Periodic cloud poll every 20 seconds
-    const interval = setInterval(fetchSupabaseData, 20000);
+    // Periodic cloud poll every 15 seconds
+    const interval = setInterval(fetchSupabaseData, 15000);
+
+    // Supabase Realtime Listener across all operational tables
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public' },
+        () => {
+          fetchSupabaseData();
+        }
+      )
+      .subscribe();
 
     return () => {
       window.removeEventListener('focus', handleFocus);
       clearInterval(interval);
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -1171,53 +1184,122 @@ export function StoreInventoryProvider({ children }) {
     return JSON.stringify(backupObj, null, 2);
   };
 
-  const importFullBackupData = (jsonString) => {
+  const importFullBackupData = async (jsonString) => {
     try {
       const data = JSON.parse(jsonString);
-      if (data.items && Array.isArray(data.items)) setItems(data.items);
-      if (data.usageLogs && Array.isArray(data.usageLogs)) setUsageLogs(data.usageLogs);
+      if (data.items && Array.isArray(data.items)) {
+        setItems(data.items);
+        const itemsToInsert = data.items.map((i) => ({
+          id: i.id,
+          name: i.name,
+          sku_code: i.itemCode || i.id,
+          category: i.category || 'General',
+          unit: i.unit || 'PCS',
+          current_stock: i.remainingStock !== undefined ? i.remainingStock : (i.totalStock || 0),
+          unit_price: i.unitPrice || 0,
+          min_threshold: i.minLevel || 10,
+          location: i.rackLocation || 'Main Store'
+        }));
+        await supabase.from('items').upsert(itemsToInsert);
+      }
+      if (data.usageLogs && Array.isArray(data.usageLogs)) {
+        setUsageLogs(data.usageLogs);
+        const logsToInsert = data.usageLogs.map((l) => ({
+          id: l.id,
+          type: l.type || 'Stock Out',
+          item_id: l.itemCode || l.id,
+          item_name: l.itemName || 'Item',
+          item_code: l.itemCode,
+          qty_used: parseFloat(l.qtyUsed) || 1,
+          unit_price: parseFloat(l.unitPrice) || 0,
+          line_total: parseFloat(l.lineTotal) || 0,
+          used_by: l.usedBy || 'Store',
+          department: l.department || 'Production',
+          time: l.time || 'Today',
+          timestamp: l.dateISO || new Date().toISOString()
+        }));
+        await supabase.from('usage_logs').upsert(logsToInsert);
+      }
+      if (data.machineSales && Array.isArray(data.machineSales)) {
+        setMachineSales(data.machineSales);
+        const salesToInsert = data.machineSales.map((s) => ({
+          id: s.id,
+          sale_no: s.saleNo || s.id,
+          customer_name: s.customerName || 'Customer',
+          customer_phone: s.customerPhone,
+          city_address: s.cityAddress,
+          machine_name: s.machineName,
+          serial_no: s.serialNo,
+          qty: parseFloat(s.qty) || 1,
+          unit_price: parseFloat(s.unitPrice) || 0,
+          discount_amount: parseFloat(s.discountAmount) || 0,
+          line_total: parseFloat(s.lineTotal) || 0,
+          paid_amount: parseFloat(s.paidAmount) || 0,
+          balance_amount: parseFloat(s.balanceAmount) || 0,
+          payment_status: s.paymentStatus || 'Paid',
+          time: s.time,
+          items: s.items || []
+        }));
+        await supabase.from('machine_sales').upsert(salesToInsert);
+      }
       if (data.vendors && Array.isArray(data.vendors)) setVendors(data.vendors);
       if (data.categories && Array.isArray(data.categories)) setCategories(data.categories);
       if (data.masterItemNames && Array.isArray(data.masterItemNames)) setMasterItemNames(data.masterItemNames);
-      if (data.machineSales && Array.isArray(data.machineSales)) setMachineSales(data.machineSales);
       if (data.machineModels && Array.isArray(data.machineModels)) setMachineModels(data.machineModels);
       if (data.machineRecipes && Array.isArray(data.machineRecipes)) setMachineRecipes(data.machineRecipes);
-      if (data.customerPayments && Array.isArray(data.customerPayments)) setCustomerPayments(data.customerPayments);
-      if (data.vendorPayments && Array.isArray(data.vendorPayments)) setVendorPayments(data.vendorPayments);
 
-      return { success: true, message: 'All Store Data Successfully Restored!' };
+      await fetchSupabaseData();
+      return { success: true, message: 'All Store Data Successfully Restored to Cloud Database!' };
     } catch (err) {
       console.error(err);
-      return { success: false, message: 'Invalid Backup JSON File format.' };
+      return { success: false, message: 'Invalid Backup JSON File format or database sync error.' };
     }
   };
 
-  const resetAllDataToZero = () => {
-    const keysToRemove = [
-      'store_inventory_items',
-      'store_usage_logs',
-      'store_vendors',
-      'store_machine_sales',
-      'store_customer_payments',
-      'store_vendor_payments',
-      'rehmat_store_items_v2',
-      'rehmat_store_usage_logs_v2',
-      'rehmat_store_vendors_v2',
-      'rehmat_store_machine_sales_v2',
-      'rehmat_store_customer_payments_v2',
-      'rehmat_store_vendor_payments_v2'
-    ];
+  const resetAllDataToZero = async () => {
+    try {
+      // 1. Wipe all operational tables in Supabase Cloud Database
+      await Promise.allSettled([
+        supabase.from('items').delete().neq('id', '00000_SYSTEM_WIPE'),
+        supabase.from('usage_logs').delete().neq('id', '00000_SYSTEM_WIPE'),
+        supabase.from('vendors').delete().neq('id', '00000_SYSTEM_WIPE'),
+        supabase.from('machine_sales').delete().neq('id', '00000_SYSTEM_WIPE'),
+        supabase.from('customer_payments').delete().neq('id', '00000_SYSTEM_WIPE'),
+        supabase.from('vendor_payments').delete().neq('id', '00000_SYSTEM_WIPE'),
+        supabase.from('categories').delete().neq('id', '00000_SYSTEM_WIPE')
+      ]);
 
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
+      // 2. Clear all local browser storage
+      const keysToRemove = [
+        'store_inventory_items',
+        'store_usage_logs',
+        'store_vendors',
+        'store_machine_sales',
+        'store_customer_payments',
+        'store_vendor_payments',
+        'rehmat_store_items_v2',
+        'rehmat_store_usage_logs_v2',
+        'rehmat_store_vendors_v2',
+        'rehmat_store_machine_sales_v2',
+        'rehmat_store_customer_payments_v2',
+        'rehmat_store_vendor_payments_v2'
+      ];
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
+      sessionStorage.clear();
 
-    setItems([]);
-    setUsageLogs([]);
-    setVendors([]);
-    setMachineSales([]);
-    setCustomerPayments([]);
-    setVendorPayments([]);
+      // 3. Clear UI State
+      setItems([]);
+      setUsageLogs([]);
+      setVendors([]);
+      setMachineSales([]);
+      setCustomerPayments([]);
+      setVendorPayments([]);
 
-    return { success: true, message: 'All demo data reset to 0! System is now clean.' };
+      return { success: true, message: 'All Cloud Database records & Local Storage wiped successfully to 0!' };
+    } catch (err) {
+      console.error('Reset Data Error:', err);
+      return { success: false, message: 'Wipe error: ' + err.message };
+    }
   };
 
   // 13. Memoized Speed Optimizations & Computed Metrics

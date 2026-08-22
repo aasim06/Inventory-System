@@ -42,9 +42,9 @@ export default function BackupRestorePage() {
   const [restoreStatus, setRestoreStatus] = useState(null);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
-  const handleResetData = () => {
-    const res = resetAllDataToZero();
-    setRestoreStatus({ type: 'success', message: res.message });
+  const handleResetData = async () => {
+    const res = await resetAllDataToZero();
+    setRestoreStatus({ type: res.success ? 'success' : 'error', message: res.message });
     setResetConfirmOpen(false);
   };
 
@@ -69,9 +69,9 @@ export default function BackupRestorePage() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const content = event.target.result;
-      const res = importFullBackupData(content);
+      const res = await importFullBackupData(content);
       if (res.success) {
         setRestoreStatus({ type: 'success', message: res.message });
       } else {
